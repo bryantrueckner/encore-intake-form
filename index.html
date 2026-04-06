@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Encore - Deal Intake Form</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f0f2f5; min-height: 100vh; padding: 20px; }
+  .container { max-width: 600px; margin: 0 auto; }
+  .header { text-align: center; margin-bottom: 24px; }
+  .header h1 { font-size: 24px; color: #1a1a2e; margin-bottom: 4px; }
+  .header p { color: #666; font-size: 14px; }
+  .card { background: white; border-radius: 12px; padding: 24px; margin-bottom: 16px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+  .card h2 { font-size: 16px; color: #1a1a2e; margin-bottom: 16px; padding-bottom: 8px; border-bottom: 2px solid #eee; }
+  .field { margin-bottom: 14px; }
+  .field label { display: block; font-size: 13px; font-weight: 600; color: #444; margin-bottom: 4px; }
+  .field input, .field select, .field textarea { width: 100%; padding: 10px 12px; border: 1px solid #ddd; border-radius: 8px; font-size: 14px; font-family: inherit; transition: border-color 0.2s; }
+  .field input:focus, .field select:focus, .field textarea:focus { outline: none; border-color: #4361ee; box-shadow: 0 0 0 3px rgba(67,97,238,0.1); }
+  .field textarea { resize: vertical; min-height: 80px; }
+  .field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .required::after { content: ' *'; color: #e74c3c; }
+  .conditional { display: none; }
+  .conditional.show { display: block; }
+  .stage-badge { display: inline-flex; align-items: center; gap: 6px; padding: 8px 14px; border-radius: 20px; font-size: 13px; font-weight: 600; margin-bottom: 14px; }
+  .stage-badge.listing { background: #e8f5e9; color: #2e7d32; }
+  .stage-badge.escrow { background: #e3f2fd; color: #1565c0; }
+  .btn { width: 100%; padding: 14px; background: #4361ee; color: white; border: none; border-radius: 10px; font-size: 16px; font-weight: 600; cursor: pointer; transition: background 0.2s; }
+  .btn:hover { background: #3a56d4; }
+  .btn:disabled { background: #aaa; cursor: not-allowed; }
+  .success { display: none; text-align: center; padding: 40px; }
+  .success.show { display: block; }
+  .success h2 { color: #27ae60; font-size: 22px; margin-bottom: 8px; }
+  .success p { color: #666; }
+  .form-content { }
+  .form-content.hide { display: none; }
+  .escrow-fields { transition: all 0.2s; }
+</style>
+</head>
+<body>
+<div class="container">
+  <div class="header">
+    <h1>🏠 Encore - Deal Intake</h1>
+    <p>Submit your deal information for processing</p>
+  </div>
+
+  <div class="form-content" id="formContent">
+    <div class="card">
+      <h2>Your Information</h2>
+      <div class="field-row">
+        <div class="field">
+          <label class="required">Your Name</label>
+          <input type="text" id="agentName" placeholder="Full name" required>
+        </div>
+        <div class="field">
+          <label class="required">Your Email</label>
+          <input type="email" id="agentEmail" placeholder="email@example.com" required>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Deal Type</h2>
+      <div class="field-row">
+        <div class="field">
+          <label class="required">Type of Deal</label>
+          <select id="dealType">
+            <option value="">Select...</option>
+            <option value="mortgage">Mortgage</option>
+            <option value="re">Real Estate</option>
+          </select>
+        </div>
+        <div class="field">
+          <label class="required">Deal Stage</label>
+          <select id="dealStage" onchange="handleStageChange()">
+            <option value="in_escrow">In Escrow</option>
+            <option value="new_listing">New Listing</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Deal Details</h2>
+      <div class="field">
+        <label class="required">Property Address</label>
+        <input type="text" id="propertyAddress" placeholder="Full property address">
+      </div>
+      <div class="field">
+        <label class="required">Client Name</label>
+        <input type="text" id="clientName" placeholder="Borrower or buyer/seller name">
+      </div>
+      <div class="field-row">
+        <div class="field conditional mortgage-field">
+          <label>Loan Amount</label>
+          <input type="text" id="loanAmount" placeholder="$0.00" oninput="formatCurrency(this)">
+        </div>
+        <div class="field conditional re-field">
+          <label>Sales Price</label>
+          <input type="text" id="salesPrice" placeholder="$0.00" oninput="formatCurrency(this)">
+        </div>
+        <div class="field conditional re-field">
+          <label>Representation</label>
+          <select id="representation">
+            <option value="">Select...</option>
+            <option value="buyer">Buyer</option>
+            <option value="seller">Seller</option>
+            <option value="dual">Dual</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Escrow fields — hidden when stage is New Listing -->
+      <div id="escrowFields" class="escrow-fields">
+        <div class="field-row">
+          <div class="field">
+            <label>Escrow Company</label>
+            <input type="text" id="escrowCompany" placeholder="Escrow company name">
+          </div>
+          <div class="field">
+            <label>Estimated Close of Escrow</label>
+            <input type="date" id="estimatedCoe">
+          </div>
+        </div>
+      </div>
+
+      <div class="field">
+        <label>Notes</label>
+        <textarea id="notes" placeholder="Any additional details..."></textarea>
+      </div>
+    </div>
+
+    <button class="btn" id="submitBtn" onclick="submitForm()">Submit Deal</button>
+  </div>
+
+  <div class="success" id="successMsg">
+    <h2>✅ Deal Submitted!</h2>
+    <p id="successText">Your deal information has been received and is now in the pipeline. You'll hear back shortly.</p>
+    <br>
+    <button class="btn" onclick="resetForm()" style="max-width:200px;margin:0 auto;display:block;">Submit Another</button>
+  </div>
+</div>
+
+<script>
+const WEBHOOK_URL = 'https://webhooks.tasklet.ai/v1/public/webhook?token=a24ab4497666842f788372230aaf5ff4';
+
+const dealTypeEl = document.getElementById('dealType');
+dealTypeEl.addEventListener('change', () => {
+  const v = dealTypeEl.value;
+  document.querySelectorAll('.mortgage-field').forEach(el => el.classList.toggle('show', v === 'mortgage'));
+  document.querySelectorAll('.re-field').forEach(el => el.classList.toggle('show', v === 're'));
+});
+
+function handleStageChange() {
+  const stage = document.getElementById('dealStage').value;
+  const escrowFields = document.getElementById('escrowFields');
+  if (stage === 'new_listing') {
+    escrowFields.style.display = 'none';
+  } else {
+    escrowFields.style.display = '';
+  }
+}
+
+function formatCurrency(input) {
+  let val = input.value.replace(/[^0-9.]/g, '');
+  if (val) input.value = '$' + Number(val).toLocaleString('en-US');
+}
+
+function parseCurrency(val) {
+  if (!val) return null;
+  return parseFloat(val.replace(/[^0-9.]/g, '')) || null;
+}
+
+async function submitForm() {
+  const btn = document.getElementById('submitBtn');
+  const agentName = document.getElementById('agentName').value.trim();
+  const agentEmail = document.getElementById('agentEmail').value.trim();
+  const dealType = document.getElementById('dealType').value;
+  const dealStage = document.getElementById('dealStage').value;
+  const propertyAddress = document.getElementById('propertyAddress').value.trim();
+  const clientName = document.getElementById('clientName').value.trim();
+
+  if (!agentName || !agentEmail || !dealType || !propertyAddress || !clientName) {
+    alert('Please fill in all required fields (marked with *)');
+    return;
+  }
+
+  btn.disabled = true;
+  btn.textContent = 'Submitting...';
+
+  const data = {
+    agent_name: agentName,
+    agent_email: agentEmail,
+    deal_type: dealType,
+    deal_stage: dealStage,
+    property_address: propertyAddress,
+    client_name: clientName,
+    loan_amount: parseCurrency(document.getElementById('loanAmount').value),
+    sales_price: parseCurrency(document.getElementById('salesPrice').value),
+    escrow_company: dealStage === 'new_listing' ? '' : document.getElementById('escrowCompany').value.trim(),
+    estimated_coe: dealStage === 'new_listing' ? '' : document.getElementById('estimatedCoe').value,
+    representation: document.getElementById('representation').value,
+    notes: document.getElementById('notes').value.trim()
+  };
+
+  try {
+    const resp = await fetch(WEBHOOK_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data)
+    });
+    if (resp.ok) {
+      document.getElementById('formContent').classList.add('hide');
+      const successText = document.getElementById('successText');
+      if (dealStage === 'new_listing') {
+        successText.textContent = "Your listing has been submitted! Bryant will be notified right away.";
+      } else {
+        successText.textContent = "Your deal information has been received and is now in the pipeline. You'll hear back shortly.";
+      }
+      document.getElementById('successMsg').classList.add('show');
+    } else {
+      throw new Error('Server error');
+    }
+  } catch (e) {
+    alert('Something went wrong. Please try again or contact your administrator.');
+    btn.disabled = false;
+    btn.textContent = 'Submit Deal';
+  }
+}
+
+function resetForm() {
+  document.getElementById('formContent').classList.remove('hide');
+  document.getElementById('successMsg').classList.remove('show');
+  document.querySelectorAll('input, textarea, select').forEach(el => el.value = '');
+  document.querySelectorAll('.conditional').forEach(el => el.classList.remove('show'));
+  document.getElementById('dealStage').value = 'in_escrow';
+  document.getElementById('escrowFields').style.display = '';
+  document.getElementById('submitBtn').disabled = false;
+  document.getElementById('submitBtn').textContent = 'Submit Deal';
+}
+</script>
+</body>
+</html>
