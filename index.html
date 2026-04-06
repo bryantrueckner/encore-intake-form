@@ -15,16 +15,17 @@
   .card h2 { font-size: 16px; color: #1a1a2e; margin-bottom: 16px; padding-bottom: 8px; border-bottom: 2px solid #eee; }
   .field { margin-bottom: 14px; }
   .field label { display: block; font-size: 13px; font-weight: 600; color: #444; margin-bottom: 4px; }
-  .field input, .field select, .field textarea { width: 100%; padding: 10px 12px; border: 1px solid #ddd; border-radius: 8px; font-size: 14px; font-family: inherit; transition: border-color 0.2s; }
+  .field input, .field select, .field textarea { width: 100%; padding: 10px 12px; border: 1px solid #ddd; border-radius: 8px; font-size: 14px; font-family: inherit; transition: border-color 0.2s; background: white; }
+  .field select:disabled { background: #f5f5f5; color: #aaa; cursor: not-allowed; }
   .field input:focus, .field select:focus, .field textarea:focus { outline: none; border-color: #4361ee; box-shadow: 0 0 0 3px rgba(67,97,238,0.1); }
   .field textarea { resize: vertical; min-height: 80px; }
   .field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
   .required::after { content: ' *'; color: #e74c3c; }
-  .conditional { display: none; }
-  .conditional.show { display: block; }
-  .stage-badge { display: inline-flex; align-items: center; gap: 6px; padding: 8px 14px; border-radius: 20px; font-size: 13px; font-weight: 600; margin-bottom: 14px; }
-  .stage-badge.listing { background: #e8f5e9; color: #2e7d32; }
-  .stage-badge.escrow { background: #e3f2fd; color: #1565c0; }
+  .hidden { display: none !important; }
+  .loan-checkbox-card { background: #e8f0fe; border: 1px solid #c7d7fc; border-radius: 10px; padding: 14px 16px; margin-top: 4px; margin-bottom: 14px; display: flex; align-items: flex-start; gap: 12px; cursor: pointer; }
+  .loan-checkbox-card input[type=checkbox] { width: 18px; height: 18px; margin-top: 2px; flex-shrink: 0; accent-color: #4361ee; cursor: pointer; }
+  .loan-checkbox-card .loan-label { font-size: 14px; color: #1a1a2e; font-weight: 600; line-height: 1.3; }
+  .loan-checkbox-card .loan-sub { font-size: 12px; color: #555; margin-top: 2px; }
   .btn { width: 100%; padding: 14px; background: #4361ee; color: white; border: none; border-radius: 10px; font-size: 16px; font-weight: 600; cursor: pointer; transition: background 0.2s; }
   .btn:hover { background: #3a56d4; }
   .btn:disabled { background: #aaa; cursor: not-allowed; }
@@ -32,9 +33,7 @@
   .success.show { display: block; }
   .success h2 { color: #27ae60; font-size: 22px; margin-bottom: 8px; }
   .success p { color: #666; }
-  .form-content { }
   .form-content.hide { display: none; }
-  .escrow-fields { transition: all 0.2s; }
 </style>
 </head>
 <body>
@@ -64,7 +63,7 @@
       <div class="field-row">
         <div class="field">
           <label class="required">Type of Deal</label>
-          <select id="dealType">
+          <select id="dealType" onchange="handleDealTypeChange()">
             <option value="">Select...</option>
             <option value="mortgage">Mortgage</option>
             <option value="re">Real Estate</option>
@@ -72,9 +71,8 @@
         </div>
         <div class="field">
           <label class="required">Deal Stage</label>
-          <select id="dealStage" onchange="handleStageChange()">
-            <option value="in_escrow">In Escrow</option>
-            <option value="new_listing">New Listing</option>
+          <select id="dealStage" onchange="handleStageChange()" disabled>
+            <option value="">Select...</option>
           </select>
         </div>
       </div>
@@ -90,18 +88,22 @@
         <label class="required">Client Name</label>
         <input type="text" id="clientName" placeholder="Borrower or buyer/seller name">
       </div>
-      <div class="field-row">
-        <div class="field conditional mortgage-field">
-          <label>Loan Amount</label>
-          <input type="text" id="loanAmount" placeholder="$0.00" oninput="formatCurrency(this)">
-        </div>
-        <div class="field conditional re-field">
+
+      <!-- Mortgage: Loan Amount -->
+      <div class="field hidden" id="loanAmountField">
+        <label>Loan Amount</label>
+        <input type="text" id="loanAmount" placeholder="$0.00" oninput="formatCurrency(this)">
+      </div>
+
+      <!-- RE fields -->
+      <div class="field-row hidden" id="reFields">
+        <div class="field">
           <label>Sales Price</label>
           <input type="text" id="salesPrice" placeholder="$0.00" oninput="formatCurrency(this)">
         </div>
-        <div class="field conditional re-field">
+        <div class="field">
           <label>Representation</label>
-          <select id="representation">
+          <select id="representation" onchange="handleRepresentationChange()">
             <option value="">Select...</option>
             <option value="buyer">Buyer</option>
             <option value="seller">Seller</option>
@@ -110,8 +112,19 @@
         </div>
       </div>
 
-      <!-- Escrow fields — hidden when stage is New Listing -->
-      <div id="escrowFields" class="escrow-fields">
+      <!-- Buyer loan checkbox — shown when RE + Buyer -->
+      <div id="buyerLoanWrap" class="hidden">
+        <label class="loan-checkbox-card" for="alsoDoingLoan">
+          <input type="checkbox" id="alsoDoingLoan">
+          <div>
+            <div class="loan-label">🏦 Also handling the loan for this buyer</div>
+            <div class="loan-sub">This will also create a mortgage deal in the pipeline for the same property and client.</div>
+          </div>
+        </label>
+      </div>
+
+      <!-- Escrow fields — hidden for New Listing / Pre-Approved -->
+      <div id="escrowFields">
         <div class="field-row">
           <div class="field">
             <label>Escrow Company</label>
@@ -135,7 +148,7 @@
 
   <div class="success" id="successMsg">
     <h2>✅ Deal Submitted!</h2>
-    <p id="successText">Your deal information has been received and is now in the pipeline. You'll hear back shortly.</p>
+    <p id="successText">Your deal information has been received and is now in the pipeline.</p>
     <br>
     <button class="btn" onclick="resetForm()" style="max-width:200px;margin:0 auto;display:block;">Submit Another</button>
   </div>
@@ -144,20 +157,64 @@
 <script>
 const WEBHOOK_URL = 'https://webhooks.tasklet.ai/v1/public/webhook?token=a24ab4497666842f788372230aaf5ff4';
 
-const dealTypeEl = document.getElementById('dealType');
-dealTypeEl.addEventListener('change', () => {
-  const v = dealTypeEl.value;
-  document.querySelectorAll('.mortgage-field').forEach(el => el.classList.toggle('show', v === 'mortgage'));
-  document.querySelectorAll('.re-field').forEach(el => el.classList.toggle('show', v === 're'));
-});
+const MORTGAGE_STAGES = [
+  { value: 'pre_approved', label: 'Pre-Approved' },
+  { value: 'in_escrow',    label: 'In Escrow' }
+];
+const RE_STAGES = [
+  { value: 'new_listing', label: 'New Listing' },
+  { value: 'in_escrow',   label: 'In Escrow' }
+];
+
+function handleDealTypeChange() {
+  const type = document.getElementById('dealType').value;
+  const stageEl = document.getElementById('dealStage');
+
+  // Reset and repopulate stage dropdown
+  stageEl.innerHTML = '<option value="">Select...</option>';
+  stageEl.disabled = !type;
+
+  if (type === 'mortgage') {
+    MORTGAGE_STAGES.forEach(s => {
+      stageEl.innerHTML += `<option value="${s.value}">${s.label}</option>`;
+    });
+    document.getElementById('loanAmountField').classList.remove('hidden');
+    document.getElementById('reFields').classList.add('hidden');
+    document.getElementById('buyerLoanWrap').classList.add('hidden');
+  } else if (type === 're') {
+    RE_STAGES.forEach(s => {
+      stageEl.innerHTML += `<option value="${s.value}">${s.label}</option>`;
+    });
+    document.getElementById('loanAmountField').classList.add('hidden');
+    document.getElementById('reFields').classList.remove('hidden');
+  } else {
+    document.getElementById('loanAmountField').classList.add('hidden');
+    document.getElementById('reFields').classList.add('hidden');
+    document.getElementById('buyerLoanWrap').classList.add('hidden');
+  }
+
+  handleStageChange();
+}
 
 function handleStageChange() {
   const stage = document.getElementById('dealStage').value;
   const escrowFields = document.getElementById('escrowFields');
-  if (stage === 'new_listing') {
+  if (!stage || stage === 'new_listing' || stage === 'pre_approved') {
     escrowFields.style.display = 'none';
   } else {
     escrowFields.style.display = '';
+  }
+}
+
+function handleRepresentationChange() {
+  const type = document.getElementById('dealType').value;
+  const rep  = document.getElementById('representation').value;
+  const wrap = document.getElementById('buyerLoanWrap');
+  if (type === 're' && rep === 'buyer') {
+    wrap.classList.remove('hidden');
+  } else {
+    wrap.classList.add('hidden');
+    document.getElementById('alsoDoingLoan').checked = false;
   }
 }
 
@@ -171,56 +228,80 @@ function parseCurrency(val) {
   return parseFloat(val.replace(/[^0-9.]/g, '')) || null;
 }
 
+async function sendToWebhook(data) {
+  const resp = await fetch(WEBHOOK_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data)
+  });
+  if (!resp.ok) throw new Error('Server error');
+}
+
 async function submitForm() {
   const btn = document.getElementById('submitBtn');
-  const agentName = document.getElementById('agentName').value.trim();
-  const agentEmail = document.getElementById('agentEmail').value.trim();
-  const dealType = document.getElementById('dealType').value;
-  const dealStage = document.getElementById('dealStage').value;
+  const agentName       = document.getElementById('agentName').value.trim();
+  const agentEmail      = document.getElementById('agentEmail').value.trim();
+  const dealType        = document.getElementById('dealType').value;
+  const dealStage       = document.getElementById('dealStage').value;
   const propertyAddress = document.getElementById('propertyAddress').value.trim();
-  const clientName = document.getElementById('clientName').value.trim();
+  const clientName      = document.getElementById('clientName').value.trim();
+  const alsoLoan        = document.getElementById('alsoDoingLoan').checked;
 
-  if (!agentName || !agentEmail || !dealType || !propertyAddress || !clientName) {
-    alert('Please fill in all required fields (marked with *)');
+  if (!agentName || !agentEmail || !dealType || !dealStage || !propertyAddress || !clientName) {
+    alert('Please fill in all required fields (marked with *).');
     return;
   }
+
+  const isEscrow = dealStage === 'in_escrow';
 
   btn.disabled = true;
   btn.textContent = 'Submitting...';
 
-  const data = {
-    agent_name: agentName,
-    agent_email: agentEmail,
-    deal_type: dealType,
-    deal_stage: dealStage,
+  const baseData = {
+    agent_name:       agentName,
+    agent_email:      agentEmail,
     property_address: propertyAddress,
-    client_name: clientName,
-    loan_amount: parseCurrency(document.getElementById('loanAmount').value),
-    sales_price: parseCurrency(document.getElementById('salesPrice').value),
-    escrow_company: dealStage === 'new_listing' ? '' : document.getElementById('escrowCompany').value.trim(),
-    estimated_coe: dealStage === 'new_listing' ? '' : document.getElementById('estimatedCoe').value,
-    representation: document.getElementById('representation').value,
-    notes: document.getElementById('notes').value.trim()
+    client_name:      clientName,
+    loan_amount:      parseCurrency(document.getElementById('loanAmount').value),
+    sales_price:      parseCurrency(document.getElementById('salesPrice').value),
+    escrow_company:   isEscrow ? document.getElementById('escrowCompany').value.trim() : '',
+    estimated_coe:    isEscrow ? document.getElementById('estimatedCoe').value : '',
+    representation:   document.getElementById('representation').value,
+    notes:            document.getElementById('notes').value.trim()
   };
 
   try {
-    const resp = await fetch(WEBHOOK_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data)
-    });
-    if (resp.ok) {
-      document.getElementById('formContent').classList.add('hide');
-      const successText = document.getElementById('successText');
-      if (dealStage === 'new_listing') {
-        successText.textContent = "Your listing has been submitted! Bryant will be notified right away.";
-      } else {
-        successText.textContent = "Your deal information has been received and is now in the pipeline. You'll hear back shortly.";
-      }
-      document.getElementById('successMsg').classList.add('show');
-    } else {
-      throw new Error('Server error');
+    // Submit the primary deal
+    await sendToWebhook({ ...baseData, deal_type: dealType, deal_stage: dealStage });
+
+    // If RE + Buyer + also doing loan → submit a second mortgage deal
+    if (alsoLoan && dealType === 're') {
+      const mortgageStage = isEscrow ? 'in_escrow' : 'pre_approved';
+      await sendToWebhook({
+        ...baseData,
+        deal_type:      'mortgage',
+        deal_stage:     mortgageStage,
+        sales_price:    null,
+        representation: ''
+      });
     }
+
+    // Show success
+    document.getElementById('formContent').classList.add('hide');
+    let msg;
+    if (dealStage === 'new_listing') {
+      msg = alsoLoan
+        ? 'Your listing and mortgage pre-approval have both been added to the pipeline!'
+        : 'Your listing has been submitted! Bryant will be notified right away.';
+    } else if (dealStage === 'pre_approved') {
+      msg = 'Your pre-approval has been added to the pipeline. Bryant will be in touch!';
+    } else {
+      msg = alsoLoan
+        ? 'Both your real estate and mortgage deals have been added to the pipeline!'
+        : "Your deal has been received and is now in the pipeline. You'll hear back shortly.";
+    }
+    document.getElementById('successText').textContent = msg;
+    document.getElementById('successMsg').classList.add('show');
   } catch (e) {
     alert('Something went wrong. Please try again or contact your administrator.');
     btn.disabled = false;
@@ -231,13 +312,21 @@ async function submitForm() {
 function resetForm() {
   document.getElementById('formContent').classList.remove('hide');
   document.getElementById('successMsg').classList.remove('show');
-  document.querySelectorAll('input, textarea, select').forEach(el => el.value = '');
-  document.querySelectorAll('.conditional').forEach(el => el.classList.remove('show'));
-  document.getElementById('dealStage').value = 'in_escrow';
-  document.getElementById('escrowFields').style.display = '';
+  document.querySelectorAll('input:not([type=checkbox]), textarea').forEach(el => el.value = '');
+  document.querySelectorAll('select').forEach(el => el.value = '');
+  document.getElementById('alsoDoingLoan').checked = false;
+  document.getElementById('dealStage').disabled = true;
+  document.getElementById('dealStage').innerHTML = '<option value="">Select...</option>';
+  document.getElementById('loanAmountField').classList.add('hidden');
+  document.getElementById('reFields').classList.add('hidden');
+  document.getElementById('buyerLoanWrap').classList.add('hidden');
+  document.getElementById('escrowFields').style.display = 'none';
   document.getElementById('submitBtn').disabled = false;
   document.getElementById('submitBtn').textContent = 'Submit Deal';
 }
+
+// Init — hide escrow fields and RE fields on load
+document.getElementById('escrowFields').style.display = 'none';
 </script>
 </body>
 </html>
