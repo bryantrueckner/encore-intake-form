@@ -38,6 +38,7 @@
   .success h2 { color: #27ae60; font-size: 22px; margin-bottom: 8px; }
   .success p { color: #666; }
   .form-content.hide { display: none; }
+  .stage-badge { display: inline-block; background: #e8f0fe; color: #4361ee; border: 1px solid #c7d7fc; border-radius: 6px; padding: 6px 12px; font-size: 13px; font-weight: 600; margin-top: 2px; }
 </style>
 </head>
 <body>
@@ -65,8 +66,8 @@
     <div class="card">
       <h2>Deal Type</h2>
 
-      <!-- Row 1: Type + Stage -->
-      <div class="field-row">
+      <!-- Row: Type + Stage (RE only) or Type alone (Mortgage) -->
+      <div class="field-row" id="typeStageRow">
         <div class="field">
           <label class="required">Type of Deal</label>
           <select id="dealType" onchange="handleDealTypeChange()">
@@ -75,11 +76,15 @@
             <option value="re">Real Estate</option>
           </select>
         </div>
-        <div class="field">
-          <label class="required">Deal Stage</label>
+        <div class="field" id="dealStageField">
+          <label class="required" id="dealStageLabel">Deal Stage</label>
           <select id="dealStage" onchange="handleStageChange()" disabled>
             <option value="">Select...</option>
           </select>
+          <!-- Badge shown for mortgage (auto In Escrow) -->
+          <div id="stageBadge" class="hidden">
+            <span class="stage-badge">📋 In Escrow</span>
+          </div>
         </div>
       </div>
 
@@ -151,7 +156,7 @@
         <input type="text" id="salesPrice" placeholder="$0.00" oninput="formatCurrency(this)">
       </div>
 
-      <!-- Escrow fields — hidden for New Listing / Pre-Approved -->
+      <!-- Escrow fields — shown for In Escrow stage -->
       <div id="escrowFields" style="display:none">
         <div class="field-row">
           <div class="field">
@@ -185,10 +190,6 @@
 <script>
 const WEBHOOK_URL = 'https://webhooks.tasklet.ai/v1/public/webhook?token=a24ab4497666842f788372230aaf5ff4';
 
-const MORTGAGE_STAGES = [
-  { value: 'pre_approved', label: 'Pre-Approved' },
-  { value: 'in_escrow',    label: 'In Escrow' }
-];
 const RE_STAGES = [
   { value: 'new_listing', label: 'New Listing' },
   { value: 'in_escrow',   label: 'In Escrow' }
@@ -197,12 +198,15 @@ const RE_STAGES = [
 function handleDealTypeChange() {
   const type = document.getElementById('dealType').value;
   const stageEl = document.getElementById('dealStage');
+  const stageFieldEl = document.getElementById('dealStageField');
+  const stageBadge = document.getElementById('stageBadge');
 
-  // Reset stage
+  // Reset
   stageEl.innerHTML = '<option value="">Select...</option>';
-  stageEl.disabled = !type;
+  stageEl.disabled = true;
+  stageEl.classList.remove('hidden');
+  stageBadge.classList.add('hidden');
 
-  // Reset sub-fields
   document.getElementById('transactionTypeField').classList.add('hidden');
   document.getElementById('representationField').classList.add('hidden');
   document.getElementById('buyerRepWrap').classList.add('hidden');
@@ -215,29 +219,38 @@ function handleDealTypeChange() {
   document.getElementById('alsoDoingLoan').checked = false;
 
   if (type === 'mortgage') {
-    MORTGAGE_STAGES.forEach(s => {
-      stageEl.innerHTML += `<option value="${s.value}">${s.label}</option>`;
-    });
+    // Mortgage is always In Escrow — hide dropdown, show badge
+    stageEl.classList.add('hidden');
+    stageEl.value = 'in_escrow';
+    stageBadge.classList.remove('hidden');
     document.getElementById('loanAmountField').classList.remove('hidden');
     document.getElementById('transactionTypeField').classList.remove('hidden');
+    // Show escrow fields immediately for mortgage
+    document.getElementById('escrowFields').style.display = '';
   } else if (type === 're') {
     RE_STAGES.forEach(s => {
       stageEl.innerHTML += `<option value="${s.value}">${s.label}</option>`;
     });
+    stageEl.disabled = false;
     document.getElementById('salesPriceField').classList.remove('hidden');
     document.getElementById('representationField').classList.remove('hidden');
+    document.getElementById('escrowFields').style.display = 'none';
   }
 
   handleStageChange();
 }
 
 function handleStageChange() {
+  const type = document.getElementById('dealType').value;
   const stage = document.getElementById('dealStage').value;
   const escrowFields = document.getElementById('escrowFields');
-  if (!stage || stage === 'new_listing' || stage === 'pre_approved') {
-    escrowFields.style.display = 'none';
-  } else {
+  // For mortgage, always show escrow fields; for RE show only for in_escrow
+  if (type === 'mortgage') {
     escrowFields.style.display = '';
+  } else if (stage === 'in_escrow') {
+    escrowFields.style.display = '';
+  } else {
+    escrowFields.style.display = 'none';
   }
 }
 
@@ -288,15 +301,19 @@ async function submitForm() {
   const agentName       = document.getElementById('agentName').value.trim();
   const agentEmail      = document.getElementById('agentEmail').value.trim();
   const dealType        = document.getElementById('dealType').value;
-  const dealStage       = document.getElementById('dealStage').value;
+  const dealStage       = dealType === 'mortgage' ? 'in_escrow' : document.getElementById('dealStage').value;
   const transactionType = document.getElementById('transactionType').value;
   const propertyAddress = document.getElementById('propertyAddress').value.trim();
   const clientName      = document.getElementById('clientName').value.trim();
   const alsoDoingLoan   = document.getElementById('alsoDoingLoan').checked;
   const alsoRepBuyer    = document.getElementById('alsoRepresentingBuyer').checked;
 
-  if (!agentName || !agentEmail || !dealType || !dealStage || !propertyAddress || !clientName) {
+  if (!agentName || !agentEmail || !dealType || !propertyAddress || !clientName) {
     alert('Please fill in all required fields (marked with *).');
+    return;
+  }
+  if (dealType === 're' && !dealStage) {
+    alert('Please select a deal stage.');
     return;
   }
   if (dealType === 'mortgage' && !transactionType) {
@@ -333,11 +350,10 @@ async function submitForm() {
 
     // Mortgage + Purchase + also representing buyer → fire RE/Buyer deal
     if (dealType === 'mortgage' && transactionType === 'purchase' && alsoRepBuyer) {
-      const reStage = isEscrow ? 'in_escrow' : 'new_listing';
       await sendToWebhook({
         ...baseData,
         deal_type:        're',
-        deal_stage:       reStage,
+        deal_stage:       'in_escrow',
         transaction_type: null,
         representation:   'buyer',
         loan_amount:      null
@@ -364,8 +380,6 @@ async function submitForm() {
       msg = 'Both your mortgage and real estate deals have been added to the pipeline! Bryant will be notified.';
     } else if (dealStage === 'new_listing') {
       msg = 'Your listing has been submitted! Bryant will be notified right away.';
-    } else if (dealStage === 'pre_approved') {
-      msg = 'Your pre-approval has been added to the pipeline. Bryant will be in touch!';
     } else {
       msg = "Your deal has been received and is now in the pipeline. You'll hear back shortly.";
     }
@@ -386,7 +400,9 @@ function resetForm() {
   document.querySelectorAll('select').forEach(el => el.selectedIndex = 0);
   document.querySelectorAll('input[type=checkbox]').forEach(el => el.checked = false);
   document.getElementById('dealStage').disabled = true;
+  document.getElementById('dealStage').classList.remove('hidden');
   document.getElementById('dealStage').innerHTML = '<option value="">Select...</option>';
+  document.getElementById('stageBadge').classList.add('hidden');
   document.getElementById('transactionTypeField').classList.add('hidden');
   document.getElementById('representationField').classList.add('hidden');
   document.getElementById('buyerRepWrap').classList.add('hidden');
