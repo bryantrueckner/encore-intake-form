@@ -65,6 +65,7 @@
   .success h2 { color: #27ae60; font-size: 22px; margin-bottom: 8px; }
   .success p { color: #666; }
   .form-content.hide { display: none; }
+  .prefill-banner { background: #e8f5e9; border: 1px solid #81c784; border-radius: 8px; padding: 12px 16px; font-size: 14px; color: #1b5e20; margin-bottom: 16px; }
   .info-note { background: #fffbe6; border: 1px solid #ffe082; border-radius: 8px; padding: 10px 14px; font-size: 13px; color: #7a5c00; margin-bottom: 14px; }
 </style>
 </head>
@@ -73,6 +74,10 @@
   <div class="header">
     <h1>🏠 Encore - Deal Intake</h1>
     <p>Submit your deal information for processing</p>
+  </div>
+
+  <div class="prefill-banner hidden" id="prefillBanner">
+    📋 Pre-filled from your listing at <strong id="prefillAddress"></strong> — select your transaction type below and submit your update!
   </div>
 
   <div class="form-content" id="formContent">
@@ -424,6 +429,14 @@ function showDetailsForNewListing() {
   setHidden('listingBuyerFields', true);
   setHidden('listingLoanFields',  true);
   setHidden('listingEscrowFields',true);
+  // Pre-fill listing fields from URL params if available
+  if (window._prefillClientName && !document.getElementById('listingClientName').value) {
+    document.getElementById('listingClientName').value = window._prefillClientName;
+  }
+  if (window._prefillSalesPrice && !document.getElementById('listingSalesPrice').value) {
+    const sp = parseFloat(window._prefillSalesPrice);
+    if (sp) document.getElementById('listingSalesPrice').value = '$' + sp.toLocaleString('en-US');
+  }
 }
 
 function setHidden(id, hide) {
@@ -606,6 +619,41 @@ function resetForm() {
   document.getElementById('submitBtn').disabled = false;
   document.getElementById('submitBtn').textContent = 'Submit Deal';
 }
+// Pre-fill from URL params (used in listing reminder emails)
+(function prefillFromParams() {
+  const params = new URLSearchParams(window.location.search);
+  const agentName  = params.get('agent_name')       || '';
+  const agentEmail = params.get('agent_email')      || '';
+  const propAddr   = params.get('property_address') || '';
+  const clientName = params.get('client_name')      || '';
+  const salesPrice = params.get('sales_price')      || '';
+
+  if (!agentName && !agentEmail && !propAddr) return;
+
+  if (agentName) {
+    const el = document.getElementById('agentName');
+    el.value = agentName; el.readOnly = true; el.style.background = '#f5f5f5';
+  }
+  if (agentEmail) {
+    const el = document.getElementById('agentEmail');
+    el.value = agentEmail; el.readOnly = true; el.style.background = '#f5f5f5';
+  }
+  if (propAddr) {
+    document.getElementById('propertyAddress').value = propAddr;
+    window._prefillAddress = propAddr;
+  }
+  window._prefillClientName = clientName;
+  window._prefillSalesPrice = salesPrice;
+
+  // Show banner
+  const banner = document.getElementById('prefillBanner');
+  if (banner) {
+    banner.classList.remove('hidden');
+    const addrEl = document.getElementById('prefillAddress');
+    if (addrEl) addrEl.textContent = propAddr || 'your listing';
+  }
+})();
+
 </script>
 </body>
 </html>
