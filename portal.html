@@ -585,7 +585,7 @@ async function submitAdd() {
     property_address:addr, client_name:client, coe_date:coe, escrow_company:escrow,
     loan_amount:m.deal_type==='mortgage'?amt:'', sales_price:m.deal_type==='re'?amt:'', ...m
   })});
-  closeModal(); toast('🎉 Deal submitted! It'll appear once your broker confirms.','ok');
+  closeModal(); toast('🎉 Deal submitted! It will appear once your broker confirms.','ok');
 }
 
 // ── CHANGE REQUESTS ───────────────────────────────
@@ -668,7 +668,7 @@ function renderGoals() {
   const yr = new Date().getFullYear();
   const myGoals = goals.filter(g=>g.target_year===yr);
   if (!myGoals.length) {
-    el.innerHTML = emptyState('🎯',"No goals set yet — tap "+ Add Goal" to set one!") +
+    el.innerHTML = emptyState('🎯',"No goals set yet — tap Add Goal to set one!") +
       `<div style="font-size:12px;color:#64748b;text-align:center;margin-top:8px;">Your broker can see everything you set here</div>`;
     return;
   }
