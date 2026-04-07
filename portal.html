@@ -1,0 +1,646 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Encore Agent Portal</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+  <style>
+    :root {
+      --bg: #0f172a; --card: #1e293b; --card2: #263450;
+      --border: rgba(255,255,255,0.1); --text: #e2e8f0; --text2: #94a3b8;
+      --accent: #6366f1; --accent2: #818cf8;
+      --green: #22c55e; --yellow: #f59e0b; --red: #ef4444; --purple: #a855f7;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
+
+    /* LOGIN */
+    #loginScreen { min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 24px; background: linear-gradient(135deg, #0f172a, #1a1f3a); }
+    .login-card { background: var(--card); border: 1px solid var(--border); border-radius: 20px; padding: 36px 28px; width: 100%; max-width: 400px; text-align: center; }
+    .login-brand { font-size: 28px; font-weight: 800; letter-spacing: -0.5px; margin-bottom: 4px; }
+    .login-brand span { color: var(--accent2); }
+    .login-sub { font-size: 13px; color: var(--text2); margin-bottom: 28px; }
+    .input { width: 100%; background: rgba(255,255,255,0.05); border: 1px solid var(--border); border-radius: 12px; padding: 13px 16px; font-size: 16px; color: var(--text); margin-bottom: 12px; outline: none; }
+    .input:focus { border-color: var(--accent); }
+    .btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; background: var(--accent); color: white; border: none; border-radius: 12px; padding: 13px 20px; font-size: 15px; font-weight: 600; cursor: pointer; width: 100%; }
+    .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+    .btn-outline { background: transparent; border: 1px solid var(--border); color: var(--text2); }
+    .btn-sm { padding: 8px 14px; font-size: 13px; width: auto; border-radius: 10px; }
+    .btn-danger { background: rgba(239,68,68,0.15); border: 1px solid rgba(239,68,68,0.4); color: var(--red); }
+    .btn-warn { background: rgba(245,158,11,0.15); border: 1px solid rgba(245,158,11,0.4); color: var(--yellow); }
+    .btn-green { background: var(--green); }
+
+    /* APP */
+    #app { display: none; min-height: 100vh; }
+    .topbar { background: var(--card); border-bottom: 1px solid var(--border); padding: 12px 16px; display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; z-index: 100; }
+    .topbar-brand { font-size: 17px; font-weight: 800; letter-spacing: -0.3px; }
+    .topbar-brand span { color: var(--accent2); }
+    .agent-pill { background: rgba(99,102,241,0.15); border: 1px solid rgba(99,102,241,0.3); border-radius: 20px; padding: 5px 12px; font-size: 13px; color: var(--accent2); font-weight: 600; }
+    .logout-btn { background: transparent; border: 1px solid var(--border); color: var(--text2); border-radius: 8px; padding: 6px 12px; font-size: 13px; cursor: pointer; }
+
+    /* NAV */
+    .nav-tabs { background: var(--card); border-bottom: 1px solid var(--border); display: flex; overflow-x: auto; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
+    .nav-tabs::-webkit-scrollbar { display: none; }
+    .nav-tab { padding: 14px 20px; font-size: 14px; font-weight: 500; color: var(--text2); cursor: pointer; white-space: nowrap; border-bottom: 2px solid transparent; flex-shrink: 0; }
+    .nav-tab.active { color: var(--accent2); border-bottom-color: var(--accent); }
+
+    /* CONTENT */
+    .content { padding: 16px; max-width: 600px; margin: 0 auto; padding-bottom: 80px; }
+
+    /* STATS */
+    .stat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 16px; }
+    .stat-card { background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 14px 16px; }
+    .stat-label { font-size: 11px; color: var(--text2); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px; }
+    .stat-value { font-size: 26px; font-weight: 800; line-height: 1; }
+    .stat-sub { font-size: 11px; color: var(--text2); margin-top: 4px; }
+    .c-green { color: var(--green); } .c-yellow { color: var(--yellow); } .c-blue { color: #60a5fa; } .c-purple { color: var(--purple); } .c-accent { color: var(--accent2); }
+
+    /* COMMISSION CARD */
+    .commission-card { background: linear-gradient(135deg, rgba(99,102,241,0.2), rgba(168,85,247,0.15)); border: 1px solid rgba(99,102,241,0.35); border-radius: 14px; padding: 18px; margin-bottom: 16px; text-align: center; }
+    .commission-amount { font-size: 36px; font-weight: 900; color: var(--accent2); }
+    .commission-label { font-size: 12px; color: var(--text2); margin-top: 4px; text-transform: uppercase; letter-spacing: 0.5px; }
+
+    /* DEAL CARDS */
+    .section-title { font-size: 13px; font-weight: 700; color: var(--text2); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 10px; display: flex; align-items: center; justify-content: space-between; }
+    .see-all { font-size: 13px; cursor: pointer; color: var(--accent2); text-transform: none; letter-spacing: 0; font-weight: 500; }
+    .deal-card { background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 14px 16px; margin-bottom: 10px; cursor: pointer; transition: border-color 0.15s; }
+    .deal-card:active { opacity: 0.75; }
+    .deal-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 4px; }
+    .deal-address { font-size: 15px; font-weight: 700; flex: 1; margin-right: 8px; line-height: 1.3; }
+    .type-badge { font-size: 11px; font-weight: 700; padding: 3px 8px; border-radius: 6px; white-space: nowrap; flex-shrink: 0; }
+    .badge-mtg { background: rgba(96,165,250,0.15); color: #60a5fa; }
+    .badge-re { background: rgba(168,85,247,0.15); color: var(--purple); }
+    .deal-client { font-size: 13px; color: var(--text2); margin-bottom: 8px; }
+    .deal-meta { display: flex; gap: 6px; flex-wrap: wrap; }
+    .chip { font-size: 11px; padding: 3px 8px; border-radius: 6px; background: rgba(255,255,255,0.07); color: var(--text2); white-space: nowrap; }
+    .chip-active { background: rgba(34,197,94,0.15); color: var(--green); }
+    .chip-escrow { background: rgba(245,158,11,0.15); color: var(--yellow); }
+    .chip-closed { background: rgba(99,102,241,0.15); color: var(--accent2); }
+    .chip-done { background: rgba(34,197,94,0.15); color: var(--green); }
+
+    /* FILTER TABS */
+    .filter-row { display: flex; gap: 8px; margin-bottom: 14px; overflow-x: auto; scrollbar-width: none; }
+    .filter-row::-webkit-scrollbar { display: none; }
+    .filter-chip { padding: 7px 16px; border-radius: 20px; font-size: 13px; font-weight: 500; cursor: pointer; white-space: nowrap; background: rgba(255,255,255,0.05); border: 1px solid var(--border); color: var(--text2); flex-shrink: 0; }
+    .filter-chip.active { background: rgba(99,102,241,0.2); border-color: rgba(99,102,241,0.4); color: var(--accent2); }
+
+    /* MODAL */
+    .overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.75); z-index: 200; display: flex; align-items: flex-end; justify-content: center; }
+    .modal { background: var(--card); border-radius: 22px 22px 0 0; padding: 20px 20px 36px; width: 100%; max-width: 600px; max-height: 92vh; overflow-y: auto; }
+    .modal-handle { width: 36px; height: 4px; background: rgba(255,255,255,0.2); border-radius: 2px; margin: 0 auto 18px; }
+    .modal-title { font-size: 19px; font-weight: 800; margin-bottom: 18px; }
+    .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 18px; }
+    .modal-header .modal-title { margin-bottom: 0; }
+    .form-group { margin-bottom: 14px; }
+    .form-label { font-size: 12px; color: var(--text2); margin-bottom: 6px; display: block; font-weight: 600; text-transform: uppercase; letter-spacing: 0.4px; }
+    .form-input { width: 100%; background: rgba(255,255,255,0.05); border: 1px solid var(--border); border-radius: 10px; padding: 11px 14px; font-size: 15px; color: var(--text); outline: none; }
+    .form-input:focus { border-color: var(--accent); }
+    select.form-input { -webkit-appearance: none; }
+    .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .modal-actions { display: flex; gap: 10px; margin-top: 20px; }
+    .modal-actions .btn { flex: 1; }
+
+    /* DETAIL */
+    .detail-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 16px; }
+    .detail-item .label { font-size: 11px; color: var(--text2); text-transform: uppercase; letter-spacing: 0.4px; margin-bottom: 3px; }
+    .detail-item .value { font-size: 15px; font-weight: 600; }
+    .action-row { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 16px; }
+    .action-row .btn { flex: 1; min-width: 110px; }
+
+    /* AUTOCOMPLETE */
+    .ac-wrap { position: relative; }
+    .ac-drop { position: absolute; top: 100%; left: 0; right: 0; background: var(--card2); border: 1px solid var(--border); border-radius: 10px; z-index: 300; max-height: 220px; overflow-y: auto; margin-top: 4px; display: none; }
+    .ac-item { padding: 11px 14px; font-size: 14px; cursor: pointer; border-bottom: 1px solid rgba(255,255,255,0.05); }
+    .ac-item:last-child { border: none; }
+    .ac-item:active { background: rgba(255,255,255,0.07); }
+
+    /* TOAST */
+    .toast { position: fixed; bottom: 28px; left: 50%; transform: translateX(-50%); background: var(--card2); border: 1px solid var(--border); border-radius: 12px; padding: 12px 20px; font-size: 14px; z-index: 400; white-space: nowrap; box-shadow: 0 8px 32px rgba(0,0,0,0.5); display: none; }
+    .toast.ok { border-color: var(--green); color: var(--green); }
+    .toast.err { border-color: var(--red); color: var(--red); }
+
+    /* EMPTY */
+    .empty { text-align: center; padding: 52px 24px; color: var(--text2); }
+    .empty-icon { font-size: 44px; margin-bottom: 12px; }
+    .empty-text { font-size: 15px; }
+
+    /* FAB */
+    .fab { position: fixed; bottom: 24px; right: 20px; width: 56px; height: 56px; border-radius: 28px; background: var(--accent); color: white; border: none; font-size: 26px; cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 20px rgba(99,102,241,0.5); z-index: 50; }
+
+    /* PENDING BANNER */
+    .pending-banner { background: rgba(245,158,11,0.1); border: 1px solid rgba(245,158,11,0.3); border-radius: 10px; padding: 10px 14px; font-size: 13px; color: var(--yellow); margin-bottom: 10px; }
+
+    /* REQUEST CARD */
+    .req-card { background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 14px 16px; margin-bottom: 10px; }
+    .req-status { font-size: 12px; font-weight: 600; }
+  </style>
+</head>
+<body>
+
+<!-- LOGIN -->
+<div id="loginScreen">
+  <div class="login-card">
+    <div style="font-size:48px;margin-bottom:12px;">🏠</div>
+    <div class="login-brand">Encore <span>Portal</span></div>
+    <div class="login-sub">Agent &amp; LO Deal Dashboard</div>
+    <div id="loginForm">
+      <input type="email" class="input" id="loginEmail" placeholder="your@email.com" autocomplete="email" onkeydown="if(event.key==='Enter')sendLink()">
+      <button class="btn" onclick="sendLink()" id="loginBtn">✉️ Send Login Link</button>
+      <div id="loginErr" style="display:none;color:#ef4444;font-size:13px;margin-top:10px;"></div>
+    </div>
+    <div id="loginSent" style="display:none;text-align:center">
+      <div style="font-size:48px;margin-bottom:12px;">📬</div>
+      <div style="font-size:16px;font-weight:700;margin-bottom:8px;">Check your email!</div>
+      <div style="font-size:13px;color:#94a3b8;">Login link sent to <strong id="sentEmail" style="color:#e2e8f0"></strong>.<br>Click it to access your portal.</div>
+    </div>
+  </div>
+</div>
+
+<!-- APP -->
+<div id="app">
+  <div class="topbar">
+    <div class="topbar-brand">🏠 Encore <span>Portal</span></div>
+    <div style="display:flex;align-items:center;gap:8px;">
+      <div class="agent-pill" id="agentPill">…</div>
+      <button class="logout-btn" onclick="logout()">Sign Out</button>
+    </div>
+  </div>
+  <div class="nav-tabs">
+    <div class="nav-tab active" onclick="goTab('overview')" id="tab-overview">📊 Overview</div>
+    <div class="nav-tab" onclick="goTab('deals')" id="tab-deals">📋 My Deals</div>
+    <div class="nav-tab" onclick="goTab('requests')" id="tab-requests">📬 Requests <span id="reqBadge" style="display:none;background:#ef4444;color:white;border-radius:10px;padding:1px 7px;font-size:10px;margin-left:4px;vertical-align:middle;"></span></div>
+  </div>
+
+  <!-- OVERVIEW -->
+  <div id="view-overview" class="content">
+    <div style="margin-bottom:18px;">
+      <div style="font-size:22px;font-weight:800;" id="greeting">Hello! 👋</div>
+      <div style="font-size:13px;color:#94a3b8;" id="todayDate"></div>
+    </div>
+    <div class="stat-grid">
+      <div class="stat-card"><div class="stat-label">Active Listings</div><div class="stat-value c-green" id="sActive">—</div></div>
+      <div class="stat-card"><div class="stat-label">In Escrow</div><div class="stat-value c-yellow" id="sEscrow">—</div></div>
+      <div class="stat-card"><div class="stat-label">Closed YTD</div><div class="stat-value c-blue" id="sClosed">—</div></div>
+      <div class="stat-card"><div class="stat-label">Pipeline Value</div><div class="stat-value c-purple" id="sPipeline">—</div></div>
+    </div>
+    <div id="commCard" class="commission-card" style="display:none">
+      <div class="commission-amount" id="commTotal">$0</div>
+      <div class="commission-label">YTD Gross Commission</div>
+    </div>
+    <div class="section-title">Recent Deals <span class="see-all" onclick="goTab('deals')">See All →</span></div>
+    <div id="recentList"></div>
+  </div>
+
+  <!-- DEALS -->
+  <div id="view-deals" class="content" style="display:none">
+    <div class="filter-row">
+      <div class="filter-chip active" onclick="setFilter('all')" id="f-all">All</div>
+      <div class="filter-chip" onclick="setFilter('active_listing')" id="f-active_listing">🟢 Active</div>
+      <div class="filter-chip" onclick="setFilter('in_escrow')" id="f-in_escrow">🟡 Escrow</div>
+      <div class="filter-chip" onclick="setFilter('closed')" id="f-closed">✅ Closed</div>
+    </div>
+    <div id="dealsList"></div>
+  </div>
+
+  <!-- REQUESTS -->
+  <div id="view-requests" class="content" style="display:none">
+    <div class="section-title">My Change Requests</div>
+    <div id="reqList"></div>
+  </div>
+
+  <button class="fab" onclick="openAdd()">+</button>
+</div>
+
+<!-- MODAL -->
+<div id="overlay" class="overlay" style="display:none" onclick="overlayClick(event)">
+  <div class="modal" id="modal"></div>
+</div>
+
+<!-- TOAST -->
+<div id="toast" class="toast"></div>
+
+<script>
+const SB_URL = 'https://vfgpbfrzqkdclrtcngny.supabase.co';
+const SB_KEY = 'sb_publishable_1Bz6wml8jmYsrpvLBjWbMg_gKEKlzD_';
+const WEBHOOK = 'https://webhooks.tasklet.ai/v1/public/webhook?token=a24ab4497666842f788372230aaf5ff4';
+
+const { createClient } = supabase;
+const sb = createClient(SB_URL, SB_KEY);
+
+let user = null;
+let deals = [];
+let reqs = [];
+let filter = 'all';
+let acResults = {};
+let acTimer = null;
+
+// ── INIT ──────────────────────────────────────────
+async function init() {
+  document.getElementById('todayDate').textContent = new Date().toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric'});
+  const { data:{ session } } = await sb.auth.getSession();
+  if (session) { user = session.user; await boot(); }
+  else { show('loginScreen'); }
+  sb.auth.onAuthStateChange(async (ev, sess) => {
+    if (ev === 'SIGNED_IN' && sess) { user = sess.user; await boot(); }
+    else if (ev === 'SIGNED_OUT') { show('loginScreen'); hide('app'); }
+  });
+}
+
+// ── AUTH ──────────────────────────────────────────
+async function sendLink() {
+  const email = document.getElementById('loginEmail').value.trim();
+  if (!email) return;
+  const btn = document.getElementById('loginBtn');
+  btn.disabled = true; btn.textContent = 'Sending…';
+  const { error } = await sb.auth.signInWithOtp({ email, options:{
+    emailRedirectTo: window.location.href.split('?')[0].split('#')[0]
+  }});
+  if (error) {
+    document.getElementById('loginErr').style.display='block';
+    document.getElementById('loginErr').textContent = error.message;
+    btn.disabled=false; btn.textContent='✉️ Send Login Link';
+  } else {
+    document.getElementById('sentEmail').textContent = email;
+    document.getElementById('loginForm').style.display='none';
+    document.getElementById('loginSent').style.display='block';
+  }
+}
+
+async function logout() { await sb.auth.signOut(); show('loginScreen'); hide('app'); deals=[]; reqs=[]; }
+
+// ── BOOT ──────────────────────────────────────────
+async function boot() {
+  hide('loginScreen'); show('app');
+  const name = user.user_metadata?.full_name || user.email.split('@')[0];
+  const first = name.split(' ')[0];
+  document.getElementById('agentPill').textContent = first;
+  document.getElementById('greeting').textContent = `Hello, ${first}! 👋`;
+  await loadData();
+  renderOverview(); renderDeals(); renderReqs();
+}
+
+async function loadData() {
+  const [{ data: d }, { data: r }] = await Promise.all([
+    sb.from('portal_deals').select('*').order('created_at',{ascending:false}),
+    sb.from('portal_change_requests').select('*').order('requested_at',{ascending:false})
+  ]);
+  deals = d || [];
+  reqs = r || [];
+  const pending = reqs.filter(r=>r.status==='pending').length;
+  const badge = document.getElementById('reqBadge');
+  badge.style.display = pending ? 'inline' : 'none';
+  badge.textContent = pending;
+}
+
+// ── TABS ──────────────────────────────────────────
+function goTab(t) {
+  ['overview','deals','requests'].forEach(v=>{
+    document.getElementById(`view-${v}`).style.display = v===t?'block':'none';
+    document.getElementById(`tab-${v}`).classList.toggle('active',v===t);
+  });
+}
+function setFilter(f) {
+  filter = f;
+  ['all','active_listing','in_escrow','closed'].forEach(ff=>
+    document.getElementById(`f-${ff}`).classList.toggle('active',ff===f));
+  renderDeals();
+}
+
+// ── RENDER OVERVIEW ───────────────────────────────
+function renderOverview() {
+  const yr = new Date().getFullYear();
+  const yrs = new Date(yr,0,1);
+  const active = deals.filter(d=>d.stage==='active_listing').length;
+  const escrow = deals.filter(d=>d.stage==='in_escrow').length;
+  const closed = deals.filter(d=>d.stage==='closed'&&new Date(d.coe_date)>=yrs).length;
+  const pipe = deals.filter(d=>d.stage==='in_escrow').reduce((s,d)=>s+parseFloat(d.loan_amount||d.sales_price||0),0);
+  document.getElementById('sActive').textContent = active;
+  document.getElementById('sEscrow').textContent = escrow;
+  document.getElementById('sClosed').textContent = closed;
+  document.getElementById('sPipeline').textContent = pipe>0?'$'+Math.round(pipe/1000)+'K':'—';
+  const comm = deals.reduce((s,d)=>s+parseFloat(d.gross_commission||0),0);
+  if (comm>0) {
+    document.getElementById('commCard').style.display='block';
+    document.getElementById('commTotal').textContent='$'+comm.toLocaleString('en-US',{minimumFractionDigits:0,maximumFractionDigits:0});
+  }
+  const el = document.getElementById('recentList');
+  const recent = deals.slice(0,3);
+  el.innerHTML = recent.length ? recent.map(dealCard).join('') : emptyState('📋','No deals yet');
+}
+
+// ── RENDER DEALS ──────────────────────────────────
+function renderDeals() {
+  const list = filter==='all'?deals:deals.filter(d=>d.stage===filter);
+  document.getElementById('dealsList').innerHTML = list.length ? list.map(dealCard).join('') : emptyState('📭','No deals in this category');
+}
+
+function dealCard(d) {
+  const sl = {active_listing:'🟢 Active',in_escrow:'🟡 Escrow',closed:'✅ Closed',pre_approved:'🔵 Pre-Approved'}[d.stage]||d.stage;
+  const sc = {active_listing:'chip-active',in_escrow:'chip-escrow',closed:'chip-closed'}[d.stage]||'';
+  const tb = d.deal_type==='mortgage'?'<span class="type-badge badge-mtg">🏦 Loan</span>':'<span class="type-badge badge-re">🏠 RE</span>';
+  const addr = (d.property_address||'Unknown Address').split(',').slice(0,2).join(',');
+  const price = parseFloat(d.deal_type==='mortgage'?d.loan_amount:d.sales_price)||0;
+  const priceStr = price?'$'+price.toLocaleString():'';
+  const coe = d.coe_date ? new Date(d.coe_date+'T00:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric'}):'';
+  return `<div class="deal-card" onclick="openDetail(${d.id})">
+    <div class="deal-header"><div class="deal-address">${addr}</div>${tb}</div>
+    <div class="deal-client">${d.client_name||'Client TBD'}${d.representation?' · '+d.representation:''}</div>
+    <div class="deal-meta">
+      <span class="chip ${sc}">${sl}</span>
+      ${priceStr?`<span class="chip">${priceStr}</span>`:''}
+      ${coe?`<span class="chip">COE ${coe}</span>`:''}
+      ${d.breakdown_sent?'<span class="chip chip-done">✅ Breakdown Sent</span>':''}
+    </div>
+  </div>`;
+}
+
+// ── DEAL DETAIL ───────────────────────────────────
+function openDetail(id) {
+  const d = deals.find(x=>x.id===id); if(!d) return;
+  const pending = reqs.filter(r=>r.deal_id===id&&r.status==='pending');
+  const banners = pending.map(r=>`<div class="pending-banner">⏳ ${r.change_type==='delete'?'Deletion':'Cancellation'} request pending broker approval</div>`).join('');
+  const price = parseFloat(d.deal_type==='mortgage'?d.loan_amount:d.sales_price)||0;
+  const pLabel = d.deal_type==='mortgage'?'Loan Amount':'Sales Price';
+  const coeLabel = d.stage==='closed'?'COE Date':'Est. COE';
+  const coeVal = d.coe_date?new Date(d.coe_date+'T00:00:00').toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric'}):'—';
+  showModal(`
+    <div class="modal-handle"></div>
+    <div class="modal-header">
+      <div class="modal-title">${(d.property_address||'Deal').split(',')[0]}</div>
+      <button class="btn btn-sm btn-outline" onclick="closeModal()">✕</button>
+    </div>
+    ${banners}
+    <div class="detail-grid">
+      <div class="detail-item"><div class="label">Client</div><div class="value">${d.client_name||'—'}</div></div>
+      <div class="detail-item"><div class="label">Type</div><div class="value">${d.deal_type==='mortgage'?'🏦 Loan':'🏠 RE'}${d.representation?' · '+d.representation:''}</div></div>
+      <div class="detail-item"><div class="label">Status</div><div class="value">${{active_listing:'🟢 Active',in_escrow:'🟡 Escrow',closed:'✅ Closed'}[d.stage]||d.stage}</div></div>
+      <div class="detail-item"><div class="label">${pLabel}</div><div class="value">${price?'$'+price.toLocaleString():'—'}</div></div>
+      <div class="detail-item"><div class="label">${coeLabel}</div><div class="value">${coeVal}</div></div>
+      ${d.submitted_to?`<div class="detail-item"><div class="label">Lender</div><div class="value">${d.submitted_to}</div></div>`:''}
+      ${d.gross_commission?`<div class="detail-item"><div class="label">Commission</div><div class="value c-accent">$${parseFloat(d.gross_commission).toLocaleString()}</div></div>`:''}
+    </div>
+    ${d.notes?`<div style="margin-bottom:14px"><div class="form-label">Notes</div><div style="font-size:14px;color:#94a3b8;white-space:pre-wrap">${d.notes}</div></div>`:''}
+    <div class="action-row">
+      ${d.stage!=='closed'?`<button class="btn btn-sm" style="background:rgba(99,102,241,0.2);color:#818cf8;border:1px solid rgba(99,102,241,0.3)" onclick="openEdit(${d.id})">✏️ Edit</button>`:''}
+      ${!pending.length?`
+        <button class="btn btn-sm btn-warn" onclick="openCancelReq(${d.id})">⚠️ Cancel</button>
+        <button class="btn btn-sm btn-danger" onclick="openDeleteReq(${d.id})">🗑️ Delete</button>
+      `:''}
+    </div>
+  `);
+}
+
+// ── EDIT DEAL ─────────────────────────────────────
+function openEdit(id) {
+  const d = deals.find(x=>x.id===id); if(!d) return;
+  const price = parseFloat(d.deal_type==='mortgage'?d.loan_amount:d.sales_price)||'';
+  const pLabel = d.deal_type==='mortgage'?'Loan Amount':'Sales Price';
+  showModal(`
+    <div class="modal-handle"></div>
+    <div class="modal-title">✏️ Edit Deal</div>
+    <div class="form-group">
+      <label class="form-label">Property Address</label>
+      <div class="ac-wrap">
+        <input class="form-input" id="eAddr" value="${d.property_address||''}" oninput="acSearch(this.value,'eAddrDrop')" placeholder="Start typing…">
+        <div id="eAddrDrop" class="ac-drop"></div>
+      </div>
+    </div>
+    <div class="form-group"><label class="form-label">Client Name</label><input class="form-input" id="eClient" value="${d.client_name||''}"></div>
+    <div class="form-row">
+      <div class="form-group"><label class="form-label">${pLabel}</label><input class="form-input" id="ePrice" type="number" value="${price}"></div>
+      <div class="form-group"><label class="form-label">COE Date</label><input class="form-input" id="eCoe" type="date" value="${d.coe_date||''}"></div>
+    </div>
+    <div class="form-group"><label class="form-label">Notes</label><textarea class="form-input" id="eNotes" rows="3" style="resize:vertical">${d.notes||''}</textarea></div>
+    <div class="modal-actions">
+      <button class="btn btn-outline" onclick="openDetail(${id})">Cancel</button>
+      <button class="btn" onclick="saveEdit(${id})">Save Changes</button>
+    </div>
+  `);
+}
+
+async function saveEdit(id) {
+  const d = deals.find(x=>x.id===id); if(!d) return;
+  const addr = document.getElementById('eAddr').value.trim();
+  const client = document.getElementById('eClient').value.trim();
+  const price = document.getElementById('ePrice').value;
+  const coe = document.getElementById('eCoe').value;
+  const notes = document.getElementById('eNotes').value.trim();
+  const pf = d.deal_type==='mortgage'?{loan_amount:price}:{sales_price:price};
+  const { error } = await sb.from('portal_deals').update({
+    property_address:addr, client_name:client, ...pf, coe_date:coe||null, notes, last_synced_at:new Date().toISOString()
+  }).eq('id',id);
+  if (error) { toast('Error: '+error.message,'err'); return; }
+  fetch(WEBHOOK,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({
+    form_type:'portal_edit', tasklet_deal_id:d.tasklet_id, portal_deal_id:id,
+    agent_name:d.agent_name, agent_email:d.agent_email,
+    property_address:addr, client_name:client, price, coe_date:coe, notes, deal_type:d.deal_type
+  })}).catch(()=>{});
+  const idx = deals.findIndex(x=>x.id===id);
+  deals[idx] = {...d, property_address:addr, client_name:client, ...pf, coe_date:coe, notes};
+  closeModal(); toast('✅ Saved! Your broker has been notified.','ok');
+  renderOverview(); renderDeals();
+}
+
+// ── ADD DEAL ──────────────────────────────────────
+function openAdd() {
+  showModal(`
+    <div class="modal-handle"></div>
+    <div class="modal-title">➕ Add New Deal</div>
+    <div class="form-group">
+      <label class="form-label">Deal Type</label>
+      <select class="form-input" id="aType" onchange="addFields()">
+        <option value="">Select type…</option>
+        <option value="mortgage">🏦 Mortgage Loan</option>
+        <option value="re_buyer">🏠 RE — Buyer Rep</option>
+        <option value="re_seller">🏡 RE — Seller Rep</option>
+        <option value="re_listing">📋 RE — New Listing</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Property Address</label>
+      <div class="ac-wrap">
+        <input class="form-input" id="aAddr" oninput="acSearch(this.value,'aAddrDrop')" placeholder="Start typing address…">
+        <div id="aAddrDrop" class="ac-drop"></div>
+      </div>
+    </div>
+    <div class="form-group"><label class="form-label">Client / Borrower Name</label><input class="form-input" id="aClient" placeholder="Full name"></div>
+    <div id="aDynamic"></div>
+    <div class="modal-actions">
+      <button class="btn btn-outline" onclick="closeModal()">Cancel</button>
+      <button class="btn" onclick="submitAdd()">Submit Deal</button>
+    </div>
+  `);
+}
+
+function addFields() {
+  const t = document.getElementById('aType').value;
+  const el = document.getElementById('aDynamic');
+  if (t === 'mortgage') {
+    el.innerHTML = `
+      <div class="form-row">
+        <div class="form-group"><label class="form-label">Loan Amount</label><input class="form-input" id="aAmt" type="number" placeholder="0"></div>
+        <div class="form-group"><label class="form-label">Est. Close Date</label><input class="form-input" id="aCoe" type="date"></div>
+      </div>
+      <div class="form-group"><label class="form-label">Escrow Company</label><input class="form-input" id="aEscrow" placeholder="Optional"></div>`;
+  } else if (t) {
+    el.innerHTML = `
+      <div class="form-row">
+        <div class="form-group"><label class="form-label">Sales Price</label><input class="form-input" id="aAmt" type="number" placeholder="0"></div>
+        <div class="form-group"><label class="form-label">${t==='re_listing'?'List Date':'Est. Close Date'}</label><input class="form-input" id="aCoe" type="date"></div>
+      </div>
+      ${t!=='re_listing'?'<div class="form-group"><label class="form-label">Escrow Company</label><input class="form-input" id="aEscrow" placeholder="Optional"></div>':''}`;
+  } else { el.innerHTML = ''; }
+}
+
+async function submitAdd() {
+  const t = document.getElementById('aType')?.value;
+  const addr = document.getElementById('aAddr')?.value.trim();
+  const client = document.getElementById('aClient')?.value.trim();
+  const amt = document.getElementById('aAmt')?.value||'';
+  const coe = document.getElementById('aCoe')?.value||'';
+  const escrow = document.getElementById('aEscrow')?.value||'';
+  if (!t||!addr||!client) { toast('Fill in all required fields','err'); return; }
+  const map = {
+    mortgage:{deal_type:'mortgage',transaction_type:'purchase',representation:null},
+    re_buyer:{deal_type:'re',transaction_type:'purchase',representation:'Buyer'},
+    re_seller:{deal_type:'re',transaction_type:'purchase',representation:'Seller'},
+    re_listing:{deal_type:'re',transaction_type:'new_listing',representation:'Seller'}
+  };
+  const m = map[t];
+  await fetch(WEBHOOK,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({
+    form_type:'portal_add_deal', agent_name:user.user_metadata?.full_name||user.email, agent_email:user.email,
+    property_address:addr, client_name:client, coe_date:coe, escrow_company:escrow,
+    loan_amount:m.deal_type==='mortgage'?amt:'', sales_price:m.deal_type==='re'?amt:'', ...m
+  })});
+  closeModal(); toast('🎉 Deal submitted! It'll appear once your broker confirms.','ok');
+}
+
+// ── CHANGE REQUESTS ───────────────────────────────
+function openCancelReq(id) {
+  const d = deals.find(x=>x.id===id);
+  showModal(`
+    <div class="modal-handle"></div>
+    <div class="modal-title">⚠️ Request Cancellation</div>
+    <div style="font-size:14px;color:#94a3b8;margin-bottom:16px">This will notify your broker to cancel <strong style="color:#e2e8f0">${(d?.property_address||'').split(',')[0]}</strong>. They'll review and confirm.</div>
+    <div class="form-group"><label class="form-label">Reason (optional)</label><textarea class="form-input" id="reqNote" rows="3" placeholder="Why is this deal being cancelled?"></textarea></div>
+    <div class="modal-actions">
+      <button class="btn btn-outline" onclick="openDetail(${id})">Go Back</button>
+      <button class="btn btn-warn" onclick="submitReq(${id},'cancel')">Send Request</button>
+    </div>
+  `);
+}
+
+function openDeleteReq(id) {
+  const d = deals.find(x=>x.id===id);
+  showModal(`
+    <div class="modal-handle"></div>
+    <div class="modal-title">🗑️ Request Deletion</div>
+    <div style="font-size:14px;color:#94a3b8;margin-bottom:16px">This asks your broker to permanently remove <strong style="color:#e2e8f0">${(d?.property_address||'').split(',')[0]}</strong> from the pipeline.</div>
+    <div class="form-group"><label class="form-label">Reason (optional)</label><textarea class="form-input" id="reqNote" rows="3" placeholder="Why should this deal be removed?"></textarea></div>
+    <div class="modal-actions">
+      <button class="btn btn-outline" onclick="openDetail(${id})">Go Back</button>
+      <button class="btn btn-danger" onclick="submitReq(${id},'delete')">Send Request</button>
+    </div>
+  `);
+}
+
+async function submitReq(dealId, type) {
+  const d = deals.find(x=>x.id===dealId);
+  const note = document.getElementById('reqNote')?.value.trim()||'';
+  const { data, error } = await sb.from('portal_change_requests').insert({
+    deal_id:dealId, agent_email:user.email, agent_name:d?.agent_name, change_type:type,
+    agent_note:note, change_data:{property_address:d?.property_address,client_name:d?.client_name}
+  }).select().single();
+  if (error) { toast('Error: '+error.message,'err'); return; }
+  fetch(WEBHOOK,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({
+    form_type:'portal_change_request', request_id:data.id, deal_id:dealId,
+    tasklet_deal_id:d?.tasklet_id, agent_name:d?.agent_name, agent_email:user.email,
+    change_type:type, agent_note:note, property_address:d?.property_address, client_name:d?.client_name
+  })}).catch(()=>{});
+  reqs.unshift(data);
+  closeModal();
+  toast(type==='cancel'?'⚠️ Cancellation request sent to broker':'🗑️ Deletion request sent to broker','ok');
+  renderReqs();
+  const p = reqs.filter(r=>r.status==='pending').length;
+  const badge = document.getElementById('reqBadge');
+  badge.style.display=p?'inline':'none'; badge.textContent=p;
+}
+
+// ── REQUESTS VIEW ─────────────────────────────────
+function renderReqs() {
+  const el = document.getElementById('reqList');
+  if (!reqs.length) { el.innerHTML=emptyState('📬','No requests yet'); return; }
+  el.innerHTML = reqs.map(r=>{
+    const d = deals.find(x=>x.id===r.deal_id);
+    const addr = (d?.property_address||'Unknown Deal').split(',')[0];
+    const sm = {pending:{label:'⏳ Pending',color:'#f59e0b'},approved:{label:'✅ Approved',color:'#22c55e'},rejected:{label:'❌ Rejected',color:'#ef4444'}};
+    const s = sm[r.status]||sm.pending;
+    const tl = {cancel:'Cancellation',delete:'Deletion',edit:'Edit'}[r.change_type]||r.change_type;
+    return `<div class="req-card">
+      <div style="display:flex;justify-content:space-between;margin-bottom:4px">
+        <div style="font-weight:700">${tl} Request</div>
+        <span class="req-status" style="color:${s.color}">${s.label}</span>
+      </div>
+      <div style="font-size:14px;color:#94a3b8">${addr}</div>
+      <div style="font-size:12px;color:#64748b;margin-top:6px">${new Date(r.requested_at).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'})}</div>
+      ${r.agent_note?`<div style="font-size:12px;color:#94a3b8;margin-top:4px;font-style:italic">"${r.agent_note}"</div>`:''}
+      ${r.reject_reason?`<div style="font-size:12px;color:#ef4444;margin-top:4px">Reason: ${r.reject_reason}</div>`:''}
+    </div>`;
+  }).join('');
+}
+
+// ── ADDRESS AUTOCOMPLETE ──────────────────────────
+function acSearch(val, dropId) {
+  clearTimeout(acTimer);
+  const drop = document.getElementById(dropId); if(!drop) return;
+  if (val.length < 4) { drop.style.display='none'; return; }
+  acTimer = setTimeout(async ()=>{
+    try {
+      const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(val)}&addressdetails=1&limit=5&countrycodes=us`,{headers:{'Accept-Language':'en-US'}});
+      const results = await res.json();
+      if (!results.length) { drop.style.display='none'; return; }
+      acResults[dropId] = results.map(r=>{
+        const a=r.address;
+        const num=a.house_number||'', st=a.road||'';
+        const city=a.city||a.town||a.village||a.suburb||'';
+        const state=a.state||'', zip=a.postcode||'';
+        return [num+(num&&st?' ':'')+st,city,state+(zip?' '+zip:'')].filter(Boolean).join(', ');
+      });
+      drop.style.display='block';
+      drop.innerHTML = acResults[dropId].map((addr,i)=>`<div class="ac-item" onclick="acPick(${i},'${dropId}')">${addr}</div>`).join('');
+    } catch {}
+  }, 300);
+}
+
+function acPick(idx, dropId) {
+  const addr = (acResults[dropId]||[])[idx]; if(!addr) return;
+  const inputId = dropId.replace('Drop','');
+  const inp = document.getElementById(inputId); if(inp) inp.value = addr;
+  document.getElementById(dropId).style.display='none';
+}
+
+// ── MODAL ──────────────────────────────────────────
+function showModal(html) {
+  document.getElementById('modal').innerHTML=html;
+  document.getElementById('overlay').style.display='flex';
+}
+function closeModal() { document.getElementById('overlay').style.display='none'; }
+function overlayClick(e) { if(e.target===document.getElementById('overlay')) closeModal(); }
+
+// ── TOAST ──────────────────────────────────────────
+function toast(msg, type='ok') {
+  const el=document.getElementById('toast');
+  el.textContent=msg; el.className='toast '+type; el.style.display='block';
+  setTimeout(()=>{el.style.display='none';},3500);
+}
+
+// ── HELPERS ────────────────────────────────────────
+function show(id){document.getElementById(id).style.display='block';}
+function hide(id){document.getElementById(id).style.display='none';}
+function emptyState(icon,text){return `<div class="empty"><div class="empty-icon">${icon}</div><div class="empty-text">${text}</div></div>`;}
+
+init();
+</script>
+</body>
+</html>
