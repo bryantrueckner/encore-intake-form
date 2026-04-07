@@ -351,7 +351,7 @@ let goals = [];
 
 async function loadData() {
   const [{ data: d }, { data: r }, { data: g }] = await Promise.all([
-    sb.from('portal_deals').select('*').order('created_at',{ascending:false}),
+    sb.from('portal_deals').select('*').eq('agent_email', user.email).order('created_at',{ascending:false}),
     sb.from('portal_change_requests').select('*').order('requested_at',{ascending:false}),
     sb.from('portal_goals').select('*').order('created_at',{ascending:false})
   ]);
