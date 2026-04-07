@@ -460,30 +460,108 @@ function renderDeals() {
 function renderAllAgents() {
   const byAgent = {};
   deals.forEach(d=>{
-    const key = d.agent_name||d.agent_email||'Unknown';
-    if (!byAgent[key]) byAgent[key]={email:d.agent_email,deals:[]};
-    byAgent[key].deals.push(d);
+    const email = d.agent_email||'unknown';
+    const name = d.agent_name||email;
+    if (!byAgent[email]) byAgent[email]={name,email,deals:[]};
+    byAgent[email].deals.push(d);
   });
+  // Include agents who have goals but no deals yet
+  goals.forEach(g=>{
+    if (!byAgent[g.agent_email]) byAgent[g.agent_email]={name:g.agent_name||g.agent_email,email:g.agent_email,deals:[]};
+  });
+
   const el = document.getElementById('allAgentsList');
   if (!el) return;
-  const html = Object.entries(byAgent).sort((a,b)=>a[0].localeCompare(b[0])).map(([name,info])=>{
+  const yr = new Date().getFullYear();
+
+  const html = Object.entries(byAgent).sort((a,b)=>a[1].name.localeCompare(b[1].name)).map(([email,info])=>{
     const closed = info.deals.filter(d=>d.stage==='closed').length;
     const escrow = info.deals.filter(d=>d.stage==='in_escrow').length;
     const active = info.deals.filter(d=>d.stage==='active_listing').length;
     const ytdGross = info.deals.filter(d=>d.stage==='closed').reduce((s,d)=>s+parseFloat(d.gross_commission||0),0);
-    return `<div style="background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);border-radius:12px;padding:16px;margin-bottom:12px">
-      <div style="font-weight:600;font-size:15px;margin-bottom:4px">${name}</div>
-      <div style="font-size:12px;color:#94a3b8;margin-bottom:10px">${info.email}</div>
-      <div style="display:flex;gap:16px;flex-wrap:wrap;font-size:13px">
-        ${active?`<span>🟢 ${active} Active</span>`:''}
-        ${escrow?`<span>🟡 ${escrow} Escrow</span>`:''}
-        ${closed?`<span>✅ ${closed} Closed</span>`:''}
-        ${ytdGross?`<span style="color:#a78bfa">💰 $${Math.round(ytdGross).toLocaleString()} YTD</span>`:''}
+    const agentGoals = goals.filter(g=>g.agent_email===email && g.target_year===yr);
+    const grossGoal = agentGoals.find(g=>g.goal_type==='annual_gross');
+    const loanGoal = agentGoals.find(g=>g.goal_type==='loan_count');
+    const dealGoal = agentGoals.find(g=>g.goal_type==='deal_count');
+    const totalDeals = info.deals.length;
+    const safeId = email.replace(/[^a-z0-9]/gi,'_');
+
+    // Goal progress bars
+    const goalHtml = agentGoals.length ? `
+      <div style="margin-top:12px;padding-top:12px;border-top:1px solid rgba(255,255,255,0.07)">
+        <div style="font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:#64748b;margin-bottom:8px">🎯 ${yr} Goals</div>
+        ${grossGoal ? (() => {
+          const pct = Math.min(100, Math.round(ytdGross/grossGoal.target_amount*100));
+          return `<div style="margin-bottom:8px">
+            <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px">
+              <span>Gross Commission</span>
+              <span style="color:#a78bfa">$${Math.round(ytdGross).toLocaleString()} / $${Number(grossGoal.target_amount).toLocaleString()} (${pct}%)</span>
+            </div>
+            <div style="background:rgba(255,255,255,0.08);border-radius:4px;height:6px">
+              <div style="background:${pct>=100?'#10b981':'#a78bfa'};height:6px;border-radius:4px;width:${pct}%"></div>
+            </div>
+          </div>`;
+        })() : ''}
+        ${dealGoal ? (() => {
+          const pct = Math.min(100, Math.round(closed/dealGoal.target_amount*100));
+          return `<div style="margin-bottom:4px">
+            <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px">
+              <span>Deals Closed</span>
+              <span style="color:#60a5fa">${closed} / ${dealGoal.target_amount} (${pct}%)</span>
+            </div>
+            <div style="background:rgba(255,255,255,0.08);border-radius:4px;height:6px">
+              <div style="background:${pct>=100?'#10b981':'#60a5fa'};height:6px;border-radius:4px;width:${pct}%"></div>
+            </div>
+          </div>`;
+        })() : ''}
+        ${loanGoal ? (() => {
+          const loans = info.deals.filter(d=>d.deal_type==='mortgage'&&d.stage==='closed').length;
+          const pct = Math.min(100, Math.round(loans/loanGoal.target_amount*100));
+          return `<div style="margin-bottom:4px">
+            <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px">
+              <span>Loans Funded</span>
+              <span style="color:#34d399">${loans} / ${loanGoal.target_amount} (${pct}%)</span>
+            </div>
+            <div style="background:rgba(255,255,255,0.08);border-radius:4px;height:6px">
+              <div style="background:${pct>=100?'#10b981':'#34d399'};height:6px;border-radius:4px;width:${pct}%"></div>
+            </div>
+          </div>`;
+        })() : ''}
+      </div>` : `<div style="margin-top:10px;font-size:12px;color:#475569;font-style:italic">No goals set for ${yr}</div>`;
+
+    return `<div style="background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);border-radius:12px;margin-bottom:10px;overflow:hidden">
+      <div onclick="toggleAgent('${safeId}')" style="padding:16px;cursor:pointer;display:flex;justify-content:space-between;align-items:center">
+        <div>
+          <div style="font-weight:600;font-size:15px">${info.name}</div>
+          <div style="font-size:12px;color:#64748b;margin-top:2px">${info.email}</div>
+        </div>
+        <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;justify-content:flex-end">
+          ${active?`<span style="font-size:12px;background:rgba(16,185,129,0.15);color:#10b981;padding:3px 8px;border-radius:20px">🟢 ${active} Active</span>`:''}
+          ${escrow?`<span style="font-size:12px;background:rgba(234,179,8,0.15);color:#eab308;padding:3px 8px;border-radius:20px">🟡 ${escrow} Escrow</span>`:''}
+          ${closed?`<span style="font-size:12px;background:rgba(99,102,241,0.15);color:#818cf8;padding:3px 8px;border-radius:20px">✅ ${closed} Closed</span>`:''}
+          ${ytdGross?`<span style="font-size:12px;background:rgba(167,139,250,0.15);color:#a78bfa;padding:3px 8px;border-radius:20px;font-weight:700">💰 $${Math.round(ytdGross).toLocaleString()}</span>`:''}
+          <span id="arrow-${safeId}" style="color:#64748b;font-size:14px;margin-left:4px">▼</span>
+        </div>
       </div>
-      <div style="margin-top:10px">${info.deals.map(dealCard).join('')}</div>
+      <div id="agent-expand-${safeId}" style="display:none;padding:0 16px 16px">
+        ${goalHtml}
+        <div style="margin-top:12px;padding-top:12px;border-top:1px solid rgba(255,255,255,0.07)">
+          <div style="font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:#64748b;margin-bottom:8px">📋 All Deals (${totalDeals})</div>
+          ${info.deals.length ? info.deals.map(dealCard).join('') : `<div style="color:#475569;font-size:13px;font-style:italic">No deals yet</div>`}
+        </div>
+      </div>
     </div>`;
   }).join('');
-  el.innerHTML = html || emptyState('📭','No deals found');
+  el.innerHTML = html || emptyState('📭','No agents found');
+}
+
+function toggleAgent(safeId) {
+  const panel = document.getElementById(`agent-expand-${safeId}`);
+  const arrow = document.getElementById(`arrow-${safeId}`);
+  if (!panel) return;
+  const open = panel.style.display === 'block';
+  panel.style.display = open ? 'none' : 'block';
+  if (arrow) arrow.textContent = open ? '▼' : '▲';
 }
 
 function projComm(d) {
