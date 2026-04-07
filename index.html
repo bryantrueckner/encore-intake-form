@@ -68,6 +68,12 @@
   .prefill-banner { background: #e8f5e9; border: 1px solid #81c784; border-radius: 8px; padding: 12px 16px; font-size: 14px; color: #1b5e20; margin-bottom: 16px; }
   .info-note { background: #fffbe6; border: 1px solid #ffe082; border-radius: 8px; padding: 10px 14px; font-size: 13px; color: #7a5c00; margin-bottom: 14px; }
 
+  /* Address autocomplete */
+  .address-wrap { position: relative; }
+  .addr-suggestions { position: absolute; z-index: 100; top: 100%; left: 0; right: 0; background: white; border: 1px solid #ddd; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.12); max-height: 200px; overflow-y: auto; margin-top: 2px; }
+  .addr-suggestions li { padding: 10px 12px; font-size: 14px; cursor: pointer; border-bottom: 1px solid #f0f0f0; list-style: none; }
+  .addr-suggestions li:last-child { border-bottom: none; }
+  .addr-suggestions li:hover { background: #f0f4ff; color: #4361ee; }
   @media (max-width: 500px) {
     body { padding: 12px; }
     .field-row { grid-template-columns: 1fr !important; }
@@ -163,7 +169,10 @@
       <!-- Property Address (always) -->
       <div class="field">
         <label class="required">Property Address</label>
-        <input type="text" id="propertyAddress" placeholder="Full property address">
+        <div class="address-wrap" id="addrWrap">
+          <input type="text" id="propertyAddress" placeholder="Start typing an address..." autocomplete="off" oninput="addrInput(this.value)">
+          <ul class="addr-suggestions" id="addrSuggestions" style="display:none"></ul>
+        </div>
       </div>
 
       <!-- Loan Side Fields -->
@@ -667,5 +676,55 @@ function resetForm() {
 })();
 
 </script>
+
+  // Address autocomplete via Nominatim
+  let addrTimer = null;
+  const stateMap = {Alabama:'AL',Alaska:'AK',Arizona:'AZ',Arkansas:'AR',California:'CA',Colorado:'CO',Connecticut:'CT',Delaware:'DE',Florida:'FL',Georgia:'GA',Hawaii:'HI',Idaho:'ID',Illinois:'IL',Indiana:'IN',Iowa:'IA',Kansas:'KS',Kentucky:'KY',Louisiana:'LA',Maine:'ME',Maryland:'MD',Massachusetts:'MA',Michigan:'MI',Minnesota:'MN',Mississippi:'MS',Missouri:'MO',Montana:'MT',Nebraska:'NE',Nevada:'NV','New Hampshire':'NH','New Jersey':'NJ','New Mexico':'NM','New York':'NY','North Carolina':'NC','North Dakota':'ND',Ohio:'OH',Oklahoma:'OK',Oregon:'OR',Pennsylvania:'PA','Rhode Island':'RI','South Carolina':'SC','South Dakota':'SD',Tennessee:'TN',Texas:'TX',Utah:'UT',Vermont:'VT',Virginia:'VA',Washington:'WA','West Virginia':'WV',Wisconsin:'WI',Wyoming:'WY'};
+
+  function formatAddr(r) {
+    const a = r.address || {};
+    const num = a.house_number || '';
+    const street = a.road || '';
+    const city = a.city || a.town || a.village || a.hamlet || '';
+    const stateAbbr = stateMap[a.state] || a.state || '';
+    const zip = a.postcode || '';
+    const parts = [(num + ' ' + street).trim(), city, (stateAbbr + ' ' + zip).trim()].filter(Boolean);
+    return parts.join(', ');
+  }
+
+  function addrInput(val) {
+    clearTimeout(addrTimer);
+    const list = document.getElementById('addrSuggestions');
+    if (val.length < 4) { list.style.display = 'none'; return; }
+    addrTimer = setTimeout(async () => {
+      try {
+        const res = await fetch('https://nominatim.openstreetmap.org/search?format=json&addressdetails=1&countrycodes=us&limit=5&q=' + encodeURIComponent(val), {headers: {'User-Agent': 'EncoreIntakeForm/1.0'}});
+        const data = await res.json();
+        const addrs = data.map(formatAddr).filter(Boolean);
+        list.innerHTML = '';
+        if (addrs.length === 0) { list.style.display = 'none'; return; }
+        addrs.forEach(addr => {
+          const li = document.createElement('li');
+          li.textContent = addr;
+          li.onclick = () => {
+            document.getElementById('propertyAddress').value = addr;
+            list.style.display = 'none';
+          };
+          list.appendChild(li);
+        });
+        list.style.display = 'block';
+      } catch { list.style.display = 'none'; }
+    }, 500);
+  }
+
+  // Close suggestions on outside click
+  document.addEventListener('click', e => {
+    const wrap = document.getElementById('addrWrap');
+    if (wrap && !wrap.contains(e.target)) {
+      const list = document.getElementById('addrSuggestions');
+      if (list) list.style.display = 'none';
+    }
+  });
+
 </body>
 </html>
