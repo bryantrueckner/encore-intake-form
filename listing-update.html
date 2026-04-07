@@ -171,7 +171,8 @@
       </div>
       <div class="locked-field">
         <label>Property Address</label>
-        <span id="display-address">—</span>
+        <input type="text" id="display-address" readonly
+          style="background:#f3f4f6;border:1px solid #d1d5db;border-radius:6px;padding:8px 12px;width:100%;font-size:14px;color:#374151;cursor:not-allowed;box-sizing:border-box;" value="—">
       </div>
     </div>
 
@@ -282,13 +283,13 @@
   const dealId       = params.get('deal_id') || '';
   const agentName    = params.get('agent_name') || '';
   const agentEmail   = params.get('agent_email') || '';
-  const propAddress  = params.get('property_address') || '';
+  const propAddress  = params.get('address') || params.get('property_address') || '';
   const clientName   = params.get('client_name') || '';
   const salesPrice   = params.get('sales_price') || '';
 
   // Populate display
   document.getElementById('display-agent-name').textContent = agentName || '—';
-  document.getElementById('display-address').textContent = propAddress || '—';
+  document.getElementById('display-address').value = propAddress || '—';
   document.getElementById('banner-address').textContent = propAddress || 'Your Listing';
 
   // Pre-fill escrow fields from URL
