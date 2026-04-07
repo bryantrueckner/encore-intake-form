@@ -520,7 +520,9 @@ const LENDERS = ['11 Mortgage','AFR/eLEND','EPM','PennyMac','Rocket','The Loan S
 
 function openEdit(id) {
   const d = deals.find(x=>x.id===id); if(!d) return;
+  const isPurchaseMortgage = d.deal_type==='mortgage' && d.transaction_type==='purchase';
   const price = parseFloat(d.deal_type==='mortgage'?d.loan_amount:d.sales_price)||'';
+  const salesPrice = parseFloat(d.sales_price)||'';
   const pLabel = d.deal_type==='mortgage'?'Loan Amount':'Sales Price';
   const stageOpts = [
     {v:'active_listing',l:'🟢 Active Listing'},
@@ -578,10 +580,18 @@ function openEdit(id) {
       </div>
     </div>
     <div class="form-group"><label class="form-label">Client Name</label><input class="form-input" id="eClient" value="${d.client_name||''}"></div>
+    ${isPurchaseMortgage ? `
+    <div class="form-row">
+      <div class="form-group"><label class="form-label">Sales Price ($)</label><input class="form-input" id="eSalesPrice" type="number" value="${salesPrice}" placeholder="e.g. 650000"></div>
+      <div class="form-group"><label class="form-label">Loan Amount ($)</label><input class="form-input" id="ePrice" type="number" value="${price}" placeholder="e.g. 520000"></div>
+    </div>
+    <div class="form-group" id="eCoeRow"><label class="form-label" id="eCoeLabel">COE Date</label><input class="form-input" id="eCoe" type="date" value="${d.coe_date||''}"></div>
+    ` : `
     <div class="form-row">
       <div class="form-group"><label class="form-label">${pLabel}</label><input class="form-input" id="ePrice" type="number" value="${price}"></div>
       <div class="form-group" id="eCoeRow"><label class="form-label" id="eCoeLabel">COE Date</label><input class="form-input" id="eCoe" type="date" value="${d.coe_date||''}"></div>
     </div>
+    `}
     ${lenderRow}
     <div class="form-group"><label class="form-label">Escrow Company</label><input class="form-input" id="eEscrow" value="${d.escrow_company||''}" placeholder="Optional"></div>
     ${d.deal_type==='re'?`
@@ -644,7 +654,9 @@ async function saveEdit(id) {
   const addr = document.getElementById('eAddr').value.trim();
   const client = document.getElementById('eClient').value.trim();
   const price = document.getElementById('ePrice').value;
-  const coe = stage === 'active_listing' ? '' : (document.getElementById('eCoe').value || '');
+  const isPurchaseMortgage = d.deal_type==='mortgage' && d.transaction_type==='purchase';
+  const salesPriceVal = isPurchaseMortgage ? (document.getElementById('eSalesPrice')?.value || '') : '';
+  const coe = stage === 'active_listing' ? '' : (document.getElementById('eCoe')?.value || '');
   const notes = document.getElementById('eNotes').value.trim();
   const lender = document.getElementById('eLender')?.value || d.submitted_to || '';
   const escrow = document.getElementById('eEscrow')?.value.trim() || '';
@@ -656,9 +668,16 @@ async function saveEdit(id) {
   // Derive lo_comp_pct: prefer direct pct entry, else derive from amount
   const loCompPct = rawCompPct || (rawCompAmt && priceNum ? parseFloat((rawCompAmt/priceNum*100).toFixed(4)) : null);
   if (stage === 'closed' && !coe) { toast('Please enter a COE date for closed deals.', 'err'); return; }
-  const pf = d.deal_type==='mortgage'?{loan_amount:price}:{sales_price:price};
+  // For purchase mortgage: store both sales_price and loan_amount; for others: store the relevant one
+  const pf = isPurchaseMortgage
+    ? {loan_amount: price, sales_price: salesPriceVal || null}
+    : d.deal_type==='mortgage'
+      ? {loan_amount: price}
+      : {sales_price: price};
   const { error } = await sb.from('portal_deals').update({
-    stage, property_address:addr, client_name:client, ...pf, coe_date:coe||null, notes,
+    stage, property_address:addr, client_name:client, ...pf,
+    ...(isPurchaseMortgage && salesPriceVal ? {sales_price: salesPriceVal} : {}),
+    coe_date:coe||null, notes,
     submitted_to: lender || null, escrow_company: escrow || null,
     representation: rep || null, lo_comp_pct: loCompPct || null,
     last_synced_at:new Date().toISOString()
