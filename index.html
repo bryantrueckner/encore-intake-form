@@ -515,8 +515,11 @@ async function submitForm() {
     if (buyer  && !buyerName)    { alert('Please enter the buyer name.'); return; }
     if (seller && !sellerName)   { alert('Please enter the seller name.'); return; }
 
+    const sideCount = [loan, buyer, seller].filter(Boolean).length;
+    const groupId = sideCount > 1 ? (crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36) + Math.random().toString(36).slice(2)) : null;
     const base = { agent_name: agentName, agent_email: agentEmail, property_address: propAddr,
-                   escrow_company: escrowCo, estimated_coe: estCoe, sales_price: salesPrice, notes };
+                   escrow_company: escrowCo, estimated_coe: estCoe, sales_price: salesPrice, notes,
+                   ...(groupId ? { group_id: groupId } : {}) };
 
     btn.disabled = true; btn.textContent = 'Submitting...';
     try {
@@ -574,20 +577,25 @@ async function submitForm() {
     if (buyerAddon && !buyerName)   { alert('Please enter the buyer name.'); return; }
     if (loanAddon  && !borrowerName){ alert('Please enter the borrower name.'); return; }
 
+    const extras = [buyerAddon, loanAddon].filter(Boolean).length;
+    const listingGroupId = extras > 0 ? (crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36) + Math.random().toString(36).slice(2)) : null;
+
     btn.disabled = true; btn.textContent = 'Submitting...';
     try {
       // Always fire seller/listing deal
       await sendToWebhook({ agent_name: agentName, agent_email: agentEmail,
         property_address: listingAddr, client_name: clientName, deal_type: 're',
         deal_stage: 'new_listing', transaction_type: null, sales_price: salesPrice,
-        representation: 'seller', escrow_company: '', estimated_coe: '', notes });
+        representation: 'seller', escrow_company: '', estimated_coe: '', notes,
+        ...(listingGroupId ? { group_id: listingGroupId } : {}) });
 
       // Optional buyer rep addon
       if (buyerAddon) {
         await sendToWebhook({ agent_name: agentName, agent_email: agentEmail,
           property_address: listingAddr, client_name: buyerName, deal_type: 're',
           deal_stage: 'in_escrow', transaction_type: 'purchase', sales_price: salesPrice,
-          representation: 'buyer', escrow_company: escrowCo, estimated_coe: estCoe, notes });
+          representation: 'buyer', escrow_company: escrowCo, estimated_coe: estCoe, notes,
+          ...(listingGroupId ? { group_id: listingGroupId } : {}) });
       }
 
       // Optional loan addon
@@ -595,7 +603,8 @@ async function submitForm() {
         await sendToWebhook({ agent_name: agentName, agent_email: agentEmail,
           property_address: listingAddr, client_name: borrowerName, deal_type: 'mortgage',
           deal_stage: 'in_escrow', transaction_type: 'purchase', loan_amount: loanAmt,
-          escrow_company: escrowCo, estimated_coe: estCoe, representation: '', notes });
+          escrow_company: escrowCo, estimated_coe: estCoe, representation: '', notes,
+          ...(listingGroupId ? { group_id: listingGroupId } : {}) });
       }
 
       const extras = [buyerAddon, loanAddon].filter(Boolean).length;
