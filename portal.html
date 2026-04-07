@@ -309,7 +309,7 @@ async function sendLink() {
   document.getElementById('loginErr').style.display = 'none';
   try {
     const redirectTo = 'https://bryantrueckner.github.io/encore-intake-form/portal.html';
-    const { error } = await sb.auth.signInWithOtp({ email, options:{ emailRedirectTo: redirectTo, shouldCreateUser: false }});
+    const { error } = await sb.auth.signInWithOtp({ email, options:{ emailRedirectTo: redirectTo, shouldCreateUser: true }});
     if (error) {
       // If user doesn't exist, try creating them
       if (error.message && error.message.toLowerCase().includes('not found')) {
