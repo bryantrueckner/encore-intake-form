@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>Encore Agent Portal</title>
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.50.0/dist/umd/supabase.js"></script>
   <style>
     :root {
       --bg: #0f172a; --card: #1e293b; --card2: #263450;
@@ -255,33 +255,47 @@ let acTimer = null;
 // ── INIT ──────────────────────────────────────────
 async function init() {
   document.getElementById('todayDate').textContent = new Date().toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric'});
-  const { data:{ session } } = await sb.auth.getSession();
-  if (session) { user = session.user; await boot(); }
-  else { show('loginScreen'); }
-  sb.auth.onAuthStateChange(async (ev, sess) => {
-    if (ev === 'SIGNED_IN' && sess) { user = sess.user; await boot(); }
-    else if (ev === 'SIGNED_OUT') { show('loginScreen'); hide('app'); }
-  });
+  try {
+    const { data:{ session }, error } = await sb.auth.getSession();
+    if (error) { showLoginErr('Auth error: ' + error.message); show('loginScreen'); return; }
+    if (session) { user = session.user; await boot(); }
+    else { show('loginScreen'); }
+    sb.auth.onAuthStateChange(async (ev, sess) => {
+      if (ev === 'SIGNED_IN' && sess) { user = sess.user; await boot(); }
+      else if (ev === 'SIGNED_OUT') { show('loginScreen'); hide('app'); }
+    });
+  } catch(e) {
+    showLoginErr('Could not initialize: ' + (e.message || 'Unknown error'));
+    show('loginScreen');
+  }
 }
 
 // ── AUTH ──────────────────────────────────────────
 async function sendLink() {
   const email = document.getElementById('loginEmail').value.trim();
-  if (!email) return;
+  if (!email) { showLoginErr('Please enter your email address.'); return; }
   const btn = document.getElementById('loginBtn');
   btn.disabled = true; btn.textContent = 'Sending…';
-  const { error } = await sb.auth.signInWithOtp({ email, options:{
-    emailRedirectTo: window.location.href.split('?')[0].split('#')[0]
-  }});
-  if (error) {
-    document.getElementById('loginErr').style.display='block';
-    document.getElementById('loginErr').textContent = error.message;
+  try {
+    const redirectTo = window.location.origin + window.location.pathname;
+    const { error } = await sb.auth.signInWithOtp({ email, options:{ emailRedirectTo: redirectTo }});
+    if (error) {
+      showLoginErr(error.message);
+      btn.disabled=false; btn.textContent='✉️ Send Login Link';
+    } else {
+      document.getElementById('sentEmail').textContent = email;
+      document.getElementById('loginForm').style.display='none';
+      document.getElementById('loginSent').style.display='block';
+    }
+  } catch(e) {
+    showLoginErr('Error: ' + (e.message || 'Could not connect to auth service. Check your connection.'));
     btn.disabled=false; btn.textContent='✉️ Send Login Link';
-  } else {
-    document.getElementById('sentEmail').textContent = email;
-    document.getElementById('loginForm').style.display='none';
-    document.getElementById('loginSent').style.display='block';
   }
+}
+
+function showLoginErr(msg) {
+  const el = document.getElementById('loginErr');
+  el.style.display='block'; el.textContent = msg;
 }
 
 async function logout() { await sb.auth.signOut(); show('loginScreen'); hide('app'); deals=[]; reqs=[]; }
