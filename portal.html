@@ -669,7 +669,7 @@ async function saveEdit(id) {
     agent_name:d.agent_name, agent_email:d.agent_email,
     property_address:addr, client_name:client, price, coe_date:coe, notes,
     deal_type:d.deal_type, stage, lender, escrow_company:escrow, representation:rep,
-    lo_comp_pct: loCompPct
+    lo_comp_pct: loCompPct, group_id: d.group_id
   })}).catch(()=>{});
   const idx = deals.findIndex(x=>x.id===id);
   deals[idx] = {...d, stage, property_address:addr, client_name:client, ...pf, coe_date:coe||null, notes, submitted_to:lender, escrow_company:escrow, representation:rep||d.representation, lo_comp_pct:loCompPct};
