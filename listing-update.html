@@ -1,0 +1,390 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Listing Status Update — Encore</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #f0f2f5;
+      min-height: 100vh;
+      padding: 24px 16px;
+      color: #1a1a2e;
+    }
+    .container { max-width: 560px; margin: 0 auto; }
+
+    .banner {
+      background: #1b5e20;
+      color: white;
+      border-radius: 12px;
+      padding: 16px 20px;
+      margin-bottom: 20px;
+      font-size: 15px;
+      line-height: 1.5;
+    }
+    .banner strong { display: block; font-size: 17px; margin-bottom: 4px; }
+    .banner small { opacity: 0.85; font-size: 13px; }
+
+    .card {
+      background: white;
+      border-radius: 12px;
+      padding: 24px;
+      margin-bottom: 16px;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+    }
+    .card h2 { font-size: 16px; font-weight: 600; margin-bottom: 16px; color: #1a1a2e; }
+
+    .locked-field {
+      background: #f5f5f5;
+      border: 1px solid #e0e0e0;
+      border-radius: 8px;
+      padding: 10px 14px;
+      font-size: 14px;
+      color: #555;
+      margin-bottom: 12px;
+    }
+    .locked-field label { font-size: 11px; color: #999; text-transform: uppercase; letter-spacing: 0.5px; display: block; margin-bottom: 2px; }
+
+    .status-buttons { display: flex; gap: 12px; margin-top: 4px; }
+    .status-btn {
+      flex: 1;
+      padding: 16px;
+      border: 2px solid #e0e0e0;
+      border-radius: 10px;
+      background: white;
+      cursor: pointer;
+      font-size: 15px;
+      font-weight: 500;
+      text-align: center;
+      transition: all 0.15s;
+      color: #333;
+      line-height: 1.4;
+    }
+    .status-btn:hover { border-color: #4caf50; }
+    .status-btn.selected-active { border-color: #2e7d32; background: #e8f5e9; color: #1b5e20; }
+    .status-btn.selected-escrow { border-color: #1565c0; background: #e3f2fd; color: #0d47a1; }
+    .status-btn span { display: block; font-size: 22px; margin-bottom: 6px; }
+
+    .escrow-section { display: none; margin-top: 20px; }
+    .escrow-section.visible { display: block; }
+
+    .form-group { margin-bottom: 16px; }
+    label.field-label {
+      display: block;
+      font-size: 13px;
+      font-weight: 600;
+      color: #444;
+      margin-bottom: 6px;
+    }
+    input[type="text"], input[type="number"], input[type="date"] {
+      width: 100%;
+      padding: 10px 14px;
+      border: 1.5px solid #ddd;
+      border-radius: 8px;
+      font-size: 15px;
+      outline: none;
+      transition: border-color 0.15s;
+    }
+    input:focus { border-color: #1b5e20; }
+
+    .checkbox-group { display: flex; flex-direction: column; gap: 10px; margin-top: 4px; }
+    .checkbox-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      padding: 12px 14px;
+      border: 1.5px solid #e0e0e0;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: border-color 0.15s, background 0.15s;
+    }
+    .checkbox-item:hover { border-color: #4caf50; background: #f9fff9; }
+    .checkbox-item.locked { background: #f5f5f5; cursor: default; }
+    .checkbox-item.checked { border-color: #2e7d32; background: #e8f5e9; }
+    .checkbox-item input[type="checkbox"] { margin-top: 2px; width: 16px; height: 16px; accent-color: #2e7d32; }
+    .checkbox-item .cb-label { font-size: 14px; font-weight: 500; }
+    .checkbox-item .cb-sub { font-size: 12px; color: #777; margin-top: 2px; }
+
+    .sub-fields { margin-top: 14px; padding: 14px; background: #f8fbff; border-radius: 8px; border: 1px solid #e3f2fd; display: none; }
+    .sub-fields.visible { display: block; }
+
+    .submit-btn {
+      width: 100%;
+      padding: 15px;
+      background: #1b5e20;
+      color: white;
+      border: none;
+      border-radius: 10px;
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.15s;
+      margin-top: 8px;
+    }
+    .submit-btn:hover { background: #2e7d32; }
+    .submit-btn:disabled { background: #aaa; cursor: not-allowed; }
+
+    .success-card {
+      display: none;
+      background: #e8f5e9;
+      border: 2px solid #2e7d32;
+      border-radius: 12px;
+      padding: 28px 24px;
+      text-align: center;
+      margin-bottom: 16px;
+    }
+    .success-card .icon { font-size: 48px; margin-bottom: 12px; }
+    .success-card h2 { color: #1b5e20; font-size: 20px; margin-bottom: 8px; }
+    .success-card p { color: #388e3c; font-size: 15px; }
+
+    .error-msg { color: #c62828; font-size: 14px; margin-top: 8px; display: none; }
+
+    .divider { border: none; border-top: 1px solid #eee; margin: 20px 0; }
+  </style>
+</head>
+<body>
+<div class="container">
+
+  <div class="banner" id="banner">
+    <strong id="banner-address">Your Listing</strong>
+    <small>Listed by Encore Real Estate — click below to update us on your listing status.</small>
+  </div>
+
+  <!-- Success state -->
+  <div class="success-card" id="success-card">
+    <div class="icon">✅</div>
+    <h2>Update Received!</h2>
+    <p id="success-msg">Thanks — we've updated your listing in our system.</p>
+  </div>
+
+  <!-- Main form -->
+  <div id="main-form">
+
+    <!-- Locked agent info -->
+    <div class="card">
+      <h2>Your Info</h2>
+      <div class="locked-field">
+        <label>Agent</label>
+        <span id="display-agent-name">—</span>
+      </div>
+      <div class="locked-field">
+        <label>Property Address</label>
+        <span id="display-address">—</span>
+      </div>
+    </div>
+
+    <!-- Status selection -->
+    <div class="card">
+      <h2>What's the status of this listing?</h2>
+      <div class="status-buttons">
+        <button class="status-btn" id="btn-active" onclick="selectStatus('active')">
+          <span>🏡</span>
+          Still Active
+        </button>
+        <button class="status-btn" id="btn-escrow" onclick="selectStatus('escrow')">
+          <span>🤝</span>
+          Going Into Escrow
+        </button>
+      </div>
+
+      <!-- Escrow details -->
+      <div class="escrow-section" id="escrow-section">
+        <hr class="divider">
+        <h2>Escrow Details</h2>
+
+        <div class="form-group">
+          <label class="field-label">Escrow Company</label>
+          <input type="text" id="escrow-company" placeholder="e.g. First American Title">
+        </div>
+        <div class="form-group">
+          <label class="field-label">Estimated Close of Escrow</label>
+          <input type="date" id="estimated-coe">
+        </div>
+
+        <hr class="divider">
+        <h2>Sides You're Handling</h2>
+
+        <div class="checkbox-group">
+          <!-- Seller Rep — always checked, locked -->
+          <div class="checkbox-item locked checked" id="cb-seller">
+            <input type="checkbox" checked disabled>
+            <div>
+              <div class="cb-label">🏡 Seller Representation</div>
+              <div class="cb-sub">Already included — you listed this property</div>
+            </div>
+          </div>
+
+          <!-- Buyer Rep — optional -->
+          <div class="checkbox-item" id="cb-buyer-item" onclick="toggleSide('buyer')">
+            <input type="checkbox" id="cb-buyer">
+            <div>
+              <div class="cb-label">🏠 Buyer Representation</div>
+              <div class="cb-sub">Check if you're also representing the buyer</div>
+            </div>
+          </div>
+          <div class="sub-fields" id="buyer-fields">
+            <div class="form-group">
+              <label class="field-label">Buyer Name</label>
+              <input type="text" id="buyer-name" placeholder="Buyer's full name">
+            </div>
+          </div>
+
+          <!-- Loan — optional -->
+          <div class="checkbox-item" id="cb-loan-item" onclick="toggleSide('loan')">
+            <input type="checkbox" id="cb-loan">
+            <div>
+              <div class="cb-label">🏦 Loan (Encore Mortgage)</div>
+              <div class="cb-sub">Check if you're handling the mortgage</div>
+            </div>
+          </div>
+          <div class="sub-fields" id="loan-fields">
+            <div class="form-group">
+              <label class="field-label">Borrower Name</label>
+              <input type="text" id="borrower-name" placeholder="Borrower's full name">
+            </div>
+            <div class="form-group">
+              <label class="field-label">Loan Amount ($)</label>
+              <input type="number" id="loan-amount" placeholder="e.g. 450000">
+            </div>
+          </div>
+        </div>
+
+        <!-- Sales price (confirm or update) -->
+        <hr class="divider">
+        <div class="form-group">
+          <label class="field-label">Sales Price ($)</label>
+          <input type="number" id="sales-price" placeholder="e.g. 395000">
+        </div>
+
+        <div class="form-group">
+          <label class="field-label">Client Name (Seller)</label>
+          <input type="text" id="client-name" placeholder="Seller's name">
+        </div>
+      </div>
+    </div>
+
+    <div id="error-msg" class="error-msg"></div>
+
+    <button class="submit-btn" id="submit-btn" onclick="submitForm()" style="display:none;">
+      Submit Update
+    </button>
+
+  </div>
+</div>
+
+<script>
+  const WEBHOOK_URL = 'https://webhooks.tasklet.ai/v1/public/webhook?token=a24ab4497666842f788372230aaf5ff4';
+
+  // Read URL params
+  const params = new URLSearchParams(window.location.search);
+  const dealId       = params.get('deal_id') || '';
+  const agentName    = params.get('agent_name') || '';
+  const agentEmail   = params.get('agent_email') || '';
+  const propAddress  = params.get('property_address') || '';
+  const clientName   = params.get('client_name') || '';
+  const salesPrice   = params.get('sales_price') || '';
+
+  // Populate display
+  document.getElementById('display-agent-name').textContent = agentName || '—';
+  document.getElementById('display-address').textContent = propAddress || '—';
+  document.getElementById('banner-address').textContent = propAddress || 'Your Listing';
+
+  // Pre-fill escrow fields from URL
+  if (clientName) document.getElementById('client-name').value = clientName;
+  if (salesPrice) document.getElementById('sales-price').value = salesPrice;
+
+  let selectedStatus = null;
+
+  function selectStatus(status) {
+    selectedStatus = status;
+    document.getElementById('btn-active').className = 'status-btn' + (status === 'active' ? ' selected-active' : '');
+    document.getElementById('btn-escrow').className = 'status-btn' + (status === 'escrow' ? ' selected-escrow' : '');
+    document.getElementById('escrow-section').className = 'escrow-section' + (status === 'escrow' ? ' visible' : '');
+    document.getElementById('submit-btn').style.display = 'block';
+  }
+
+  function toggleSide(side) {
+    if (side === 'buyer') {
+      const cb = document.getElementById('cb-buyer');
+      cb.checked = !cb.checked;
+      const item = document.getElementById('cb-buyer-item');
+      const fields = document.getElementById('buyer-fields');
+      item.className = 'checkbox-item' + (cb.checked ? ' checked' : '');
+      fields.className = 'sub-fields' + (cb.checked ? ' visible' : '');
+    } else if (side === 'loan') {
+      const cb = document.getElementById('cb-loan');
+      cb.checked = !cb.checked;
+      const item = document.getElementById('cb-loan-item');
+      const fields = document.getElementById('loan-fields');
+      item.className = 'checkbox-item' + (cb.checked ? ' checked' : '');
+      fields.className = 'sub-fields' + (cb.checked ? ' visible' : '');
+    }
+  }
+
+  async function submitForm() {
+    const btn = document.getElementById('submit-btn');
+    const errorEl = document.getElementById('error-msg');
+    errorEl.style.display = 'none';
+
+    if (!selectedStatus) {
+      errorEl.textContent = 'Please select a status above.';
+      errorEl.style.display = 'block';
+      return;
+    }
+
+    btn.disabled = true;
+    btn.textContent = 'Submitting…';
+
+    const payload = {
+      form_type: 'listing_update',
+      update_status: selectedStatus === 'active' ? 'still_active' : 'going_to_escrow',
+      deal_id: dealId,
+      agent_name: agentName,
+      agent_email: agentEmail,
+      property_address: propAddress,
+    };
+
+    if (selectedStatus === 'escrow') {
+      const includeBuyer = document.getElementById('cb-buyer').checked;
+      const includeLoan  = document.getElementById('cb-loan').checked;
+
+      payload.client_name      = document.getElementById('client-name').value.trim() || clientName;
+      payload.sales_price      = document.getElementById('sales-price').value || salesPrice;
+      payload.escrow_company   = document.getElementById('escrow-company').value.trim();
+      payload.estimated_coe    = document.getElementById('estimated-coe').value;
+      payload.include_buyer_rep = includeBuyer;
+      payload.include_loan     = includeLoan;
+      payload.buyer_name       = includeBuyer ? document.getElementById('buyer-name').value.trim() : '';
+      payload.borrower_name    = includeLoan  ? document.getElementById('borrower-name').value.trim() : '';
+      payload.loan_amount      = includeLoan  ? document.getElementById('loan-amount').value : '';
+    }
+
+    try {
+      await fetch(WEBHOOK_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+
+      document.getElementById('main-form').style.display = 'none';
+      document.getElementById('banner').style.display = 'none';
+      const successCard = document.getElementById('success-card');
+      successCard.style.display = 'block';
+
+      if (selectedStatus === 'active') {
+        document.getElementById('success-msg').textContent = "Thanks! We've noted that your listing is still active. We'll check back in two weeks.";
+      } else {
+        document.getElementById('success-msg').textContent = "Congrats! We've updated your listing to In Escrow and added any additional sides. You'll hear from us soon!";
+      }
+    } catch (err) {
+      errorEl.textContent = 'Something went wrong. Please try again or contact us directly.';
+      errorEl.style.display = 'block';
+      btn.disabled = false;
+      btn.textContent = 'Submit Update';
+    }
+  }
+</script>
+</body>
+</html>
