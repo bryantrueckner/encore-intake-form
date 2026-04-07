@@ -134,6 +134,13 @@
     /* REQUEST CARD */
     .req-card { background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 14px 16px; margin-bottom: 10px; }
     .req-status { font-size: 12px; font-weight: 600; }
+
+    /* GOAL CARD */
+    .goal-card { background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 16px; margin-bottom: 12px; }
+    .goal-progress { background: rgba(255,255,255,0.07); border-radius: 6px; height: 8px; margin: 10px 0 6px; overflow: hidden; }
+    .goal-bar { height: 100%; border-radius: 6px; background: linear-gradient(90deg, var(--accent), var(--purple)); transition: width 0.4s; }
+    .goal-pct { font-size: 12px; color: var(--text2); }
+    .goal-meta { font-size: 12px; color: var(--text2); margin-top: 4px; }
   </style>
 </head>
 <body>
@@ -169,6 +176,7 @@
   <div class="nav-tabs">
     <div class="nav-tab active" onclick="goTab('overview')" id="tab-overview">📊 Overview</div>
     <div class="nav-tab" onclick="goTab('deals')" id="tab-deals">📋 My Deals</div>
+    <div class="nav-tab" onclick="goTab('goals')" id="tab-goals">🎯 Goals</div>
     <div class="nav-tab" onclick="goTab('requests')" id="tab-requests">📬 Requests <span id="reqBadge" style="display:none;background:#ef4444;color:white;border-radius:10px;padding:1px 7px;font-size:10px;margin-left:4px;vertical-align:middle;"></span></div>
   </div>
 
@@ -201,6 +209,15 @@
       <div class="filter-chip" onclick="setFilter('closed')" id="f-closed">✅ Closed</div>
     </div>
     <div id="dealsList"></div>
+  </div>
+
+  <!-- GOALS -->
+  <div id="view-goals" class="content" style="display:none">
+    <div class="section-title" style="margin-bottom:16px">
+      🎯 My Goals
+      <button class="btn btn-sm" style="background:rgba(99,102,241,0.2);color:#818cf8;border:1px solid rgba(99,102,241,0.3);font-size:12px;width:auto;padding:6px 12px;" onclick="openAddGoal()">+ Add Goal</button>
+    </div>
+    <div id="goalsList"></div>
   </div>
 
   <!-- REQUESTS -->
@@ -280,11 +297,15 @@ async function boot() {
   renderOverview(); renderDeals(); renderReqs();
 }
 
+let goals = [];
+
 async function loadData() {
-  const [{ data: d }, { data: r }] = await Promise.all([
+  const [{ data: d }, { data: r }, { data: g }] = await Promise.all([
     sb.from('portal_deals').select('*').order('created_at',{ascending:false}),
-    sb.from('portal_change_requests').select('*').order('requested_at',{ascending:false})
+    sb.from('portal_change_requests').select('*').order('requested_at',{ascending:false}),
+    sb.from('portal_goals').select('*').order('created_at',{ascending:false})
   ]);
+  goals = g || [];
   deals = d || [];
   reqs = r || [];
   const pending = reqs.filter(r=>r.status==='pending').length;
@@ -295,10 +316,11 @@ async function loadData() {
 
 // ── TABS ──────────────────────────────────────────
 function goTab(t) {
-  ['overview','deals','requests'].forEach(v=>{
+  ['overview','deals','goals','requests'].forEach(v=>{
     document.getElementById(`view-${v}`).style.display = v===t?'block':'none';
     document.getElementById(`tab-${v}`).classList.toggle('active',v===t);
   });
+  if (t==='goals') renderGoals();
 }
 function setFilter(f) {
   filter = f;
@@ -588,6 +610,121 @@ function renderReqs() {
       ${r.reject_reason?`<div style="font-size:12px;color:#ef4444;margin-top:4px">Reason: ${r.reject_reason}</div>`:''}
     </div>`;
   }).join('');
+}
+
+// ── GOALS ──────────────────────────────────────────
+function renderGoals() {
+  const el = document.getElementById('goalsList');
+  const yr = new Date().getFullYear();
+  const myGoals = goals.filter(g=>g.target_year===yr);
+  if (!myGoals.length) {
+    el.innerHTML = emptyState('🎯',"No goals set yet — tap "+ Add Goal" to set one!") +
+      `<div style="font-size:12px;color:#64748b;text-align:center;margin-top:8px;">Your broker can see everything you set here</div>`;
+    return;
+  }
+  // Calculate actuals from deals
+  const yr1 = new Date(yr,0,1);
+  const closedDeals = deals.filter(d=>d.stage==='closed'&&new Date(d.coe_date||0)>=yr1);
+  const ytdGross = closedDeals.reduce((s,d)=>s+parseFloat(d.gross_commission||0),0);
+  const ytdLoans = closedDeals.filter(d=>d.deal_type==='mortgage').length;
+  const ytdDeals = closedDeals.length;
+
+  el.innerHTML = myGoals.map(g=>{
+    const actual = g.goal_type==='annual_gross'?ytdGross:g.goal_type==='loan_count'?ytdLoans:ytdDeals;
+    const pct = g.target_amount>0?Math.min(100,Math.round(actual/g.target_amount*100)):0;
+    const label = {annual_gross:'Annual Gross Commission',loan_count:'Loans Funded',deal_count:'Total Deals Closed'}[g.goal_type]||g.goal_type;
+    const actualFmt = g.goal_type==='annual_gross'?'$'+actual.toLocaleString():actual;
+    const targetFmt = g.goal_type==='annual_gross'?'$'+parseFloat(g.target_amount).toLocaleString():g.target_amount;
+    const statusColor = pct>=100?'var(--green)':pct>=60?'var(--yellow)':'var(--accent2)';
+    return `<div class="goal-card">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start">
+        <div>
+          <div style="font-size:15px;font-weight:700;">${label}</div>
+          <div class="goal-meta">${g.target_year} Goal</div>
+        </div>
+        <div style="display:flex;gap:6px;align-items:center">
+          <span style="font-size:13px;font-weight:700;color:${statusColor}">${pct}%</span>
+          <button onclick="deleteGoal(${g.id})" style="background:none;border:none;cursor:pointer;color:#64748b;font-size:14px;padding:2px 4px">🗑️</button>
+        </div>
+      </div>
+      <div class="goal-progress"><div class="goal-bar" style="width:${pct}%"></div></div>
+      <div style="display:flex;justify-content:space-between">
+        <span class="goal-pct">${actualFmt} so far</span>
+        <span class="goal-pct">Target: ${targetFmt}</span>
+      </div>
+      ${g.notes?`<div style="font-size:12px;color:#64748b;margin-top:6px;font-style:italic">"${g.notes}"</div>`:''}
+    </div>`;
+  }).join('') + `<div style="font-size:12px;color:#64748b;text-align:center;margin-top:4px;">Your broker can see your goals</div>`;
+}
+
+function openAddGoal() {
+  const yr = new Date().getFullYear();
+  showModal(`
+    <div class="modal-handle"></div>
+    <div class="modal-title">🎯 Set a Goal</div>
+    <div class="form-group">
+      <label class="form-label">Goal Type</label>
+      <select class="form-input" id="gType">
+        <option value="annual_gross">💰 Annual Gross Commission</option>
+        <option value="loan_count">🏦 Loans Funded</option>
+        <option value="deal_count">📋 Total Deals Closed</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Target</label>
+      <input class="form-input" id="gTarget" type="number" placeholder="e.g. 100000" min="0">
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label">Year</label>
+        <input class="form-input" id="gYear" type="number" value="${yr}" min="2020" max="2030">
+      </div>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Notes (optional)</label>
+      <input class="form-input" id="gNotes" placeholder="e.g. stretch goal, team goal…">
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-outline" onclick="closeModal()">Cancel</button>
+      <button class="btn" onclick="saveGoal()">Save Goal</button>
+    </div>
+  `);
+}
+
+async function saveGoal() {
+  const gType = document.getElementById('gType').value;
+  const target = parseFloat(document.getElementById('gTarget').value);
+  const year = parseInt(document.getElementById('gYear').value);
+  const notes = document.getElementById('gNotes').value.trim();
+  if (!target || !year) { toast('Enter a target amount','err'); return; }
+  const { data, error } = await sb.from('portal_goals').insert({
+    agent_email: user.email,
+    agent_name: user.user_metadata?.full_name || user.email,
+    goal_type: gType,
+    target_amount: target,
+    target_year: year,
+    notes: notes || null
+  }).select().single();
+  if (error) { toast('Error: '+error.message,'err'); return; }
+  goals.unshift(data);
+  closeModal();
+  toast('🎯 Goal saved!','ok');
+  renderGoals();
+  // Notify Bryant via webhook
+  fetch(WEBHOOK,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({
+    form_type:'portal_goal_set',
+    agent_name: user.user_metadata?.full_name||user.email,
+    agent_email: user.email,
+    goal_type: gType, target_amount: target, target_year: year, notes
+  })}).catch(()=>{});
+}
+
+async function deleteGoal(id) {
+  const { error } = await sb.from('portal_goals').delete().eq('id',id);
+  if (error) { toast('Error: '+error.message,'err'); return; }
+  goals = goals.filter(g=>g.id!==id);
+  renderGoals();
+  toast('Goal removed','ok');
 }
 
 // ── ADDRESS AUTOCOMPLETE ──────────────────────────
