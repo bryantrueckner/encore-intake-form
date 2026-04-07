@@ -245,8 +245,13 @@ const SB_URL = 'https://vfgpbfrzqkdclrtcngny.supabase.co';
 const SB_KEY = 'sb_publishable_1Bz6wml8jmYsrpvLBjWbMg_gKEKlzD_';
 const WEBHOOK = 'https://webhooks.tasklet.ai/v1/public/webhook?token=a24ab4497666842f788372230aaf5ff4';
 
-const { createClient } = supabase;
-const sb = createClient(SB_URL, SB_KEY);
+let sb = null;
+try {
+  const { createClient } = supabase;
+  sb = createClient(SB_URL, SB_KEY);
+} catch(e) {
+  console.error('Supabase init failed:', e);
+}
 
 let user = null;
 let deals = [];
@@ -288,6 +293,7 @@ async function init() {
 
 // ── AUTH ──────────────────────────────────────────
 async function sendLink() {
+  if (!sb) { showLoginErr('⚠️ Auth library failed to load. Try refreshing, or contact Bryant.'); return; }
   const email = document.getElementById('loginEmail').value.trim();
   if (!email) { showLoginErr('Please enter your email address.'); return; }
   const btn = document.getElementById('loginBtn');
@@ -813,6 +819,9 @@ function show(id){document.getElementById(id).style.display='block';}
 function hide(id){document.getElementById(id).style.display='none';}
 function emptyState(icon,text){return `<div class="empty"><div class="empty-icon">${icon}</div><div class="empty-text">${text}</div></div>`;}
 
+if (!sb) {
+  showLoginErr('⚠️ Could not connect to auth service. Please refresh the page or try a different browser.');
+}
 init();
 </script>
 </body>
