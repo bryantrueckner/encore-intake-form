@@ -163,7 +163,7 @@
       <div style="font-size:13px;color:#94a3b8;">Login link sent to <strong id="sentEmail" style="color:#e2e8f0"></strong>.<br>Click it to access your portal.</div>
       <button class="btn btn-outline btn-sm" style="margin-top:16px;width:auto;padding:10px 20px;" onclick="document.getElementById('loginSent').style.display='none';document.getElementById('loginForm').style.display='block';">← Try again</button>
     </div>
-    <div class="login-version">v2.1 — Apr 2026</div>
+    <div class="login-version">v2.3 — Apr 2026</div>
   </div>
 </div>
 
@@ -293,11 +293,19 @@ async function init() {
 
 // ── AUTH ──────────────────────────────────────────
 async function sendLink() {
-  if (!sb) { showLoginErr('⚠️ Auth library failed to load. Try refreshing, or contact Bryant.'); return; }
-  const email = document.getElementById('loginEmail').value.trim();
-  if (!email) { showLoginErr('Please enter your email address.'); return; }
+  // Immediate visual feedback — if you see this, the button IS firing
   const btn = document.getElementById('loginBtn');
-  btn.disabled = true; btn.textContent = '⏳ Sending…';
+  btn.textContent = '⏳ Working…';
+  await new Promise(r => setTimeout(r, 100));
+
+  if (!sb) { 
+    showLoginErr('⚠️ Auth library failed to load (sb is null). Please try a different browser or contact Bryant.');
+    btn.textContent = '✉️ Send Login Link';
+    return; 
+  }
+  const email = document.getElementById('loginEmail').value.trim();
+  if (!email) { showLoginErr('Please enter your email address.'); btn.textContent = '✉️ Send Login Link'; return; }
+  btn.disabled = true;
   document.getElementById('loginErr').style.display = 'none';
   try {
     const redirectTo = 'https://bryantrueckner.github.io/encore-intake-form/portal.html';
