@@ -449,12 +449,13 @@ function openDetail(id) {
       <div class="detail-item"><div class="label">Status</div><div class="value">${{active_listing:'🟢 Active',in_escrow:'🟡 Escrow',closed:'✅ Closed'}[d.stage]||d.stage}</div></div>
       <div class="detail-item"><div class="label">${pLabel}</div><div class="value">${price?'$'+price.toLocaleString():'—'}</div></div>
       <div class="detail-item"><div class="label">${coeLabel}</div><div class="value">${coeVal}</div></div>
+      ${d.escrow_company?`<div class="detail-item"><div class="label">Escrow</div><div class="value">${d.escrow_company}</div></div>`:''}
       ${d.submitted_to?`<div class="detail-item"><div class="label">Lender</div><div class="value">${d.submitted_to}</div></div>`:''}
       ${d.gross_commission?`<div class="detail-item"><div class="label">Commission</div><div class="value c-accent">$${parseFloat(d.gross_commission).toLocaleString()}</div></div>`:''}
     </div>
     ${d.notes?`<div style="margin-bottom:14px"><div class="form-label">Notes</div><div style="font-size:14px;color:#94a3b8;white-space:pre-wrap">${d.notes}</div></div>`:''}
     <div class="action-row">
-      ${d.stage!=='closed'?`<button class="btn btn-sm" style="background:rgba(99,102,241,0.2);color:#818cf8;border:1px solid rgba(99,102,241,0.3)" onclick="openEdit(${d.id})">✏️ Edit</button>`:''}
+      <button class="btn btn-sm" style="background:rgba(99,102,241,0.2);color:#818cf8;border:1px solid rgba(99,102,241,0.3)" onclick="openEdit(${d.id})">✏️ Edit</button>
       ${!pending.length?`
         <button class="btn btn-sm btn-warn" onclick="openCancelReq(${d.id})">⚠️ Cancel</button>
         <button class="btn btn-sm btn-danger" onclick="openDeleteReq(${d.id})">🗑️ Delete</button>
@@ -464,13 +465,34 @@ function openDetail(id) {
 }
 
 // ── EDIT DEAL ─────────────────────────────────────
+const LENDERS = ['11 Mortgage','AFR/eLEND','EPM','PennyMac','Rocket','The Loan Store','UWM'];
+
 function openEdit(id) {
   const d = deals.find(x=>x.id===id); if(!d) return;
   const price = parseFloat(d.deal_type==='mortgage'?d.loan_amount:d.sales_price)||'';
   const pLabel = d.deal_type==='mortgage'?'Loan Amount':'Sales Price';
+  const stageOpts = [
+    {v:'active_listing',l:'🟢 Active Listing'},
+    {v:'in_escrow',l:'🟡 In Escrow'},
+    {v:'closed',l:'✅ Closed'}
+  ].map(o=>`<option value="${o.v}" ${d.stage===o.v?'selected':''}>${o.l}</option>`).join('');
+  const lenderOpts = LENDERS.map(l=>`<option value="${l}" ${d.submitted_to===l?'selected':''}>${l}</option>`).join('');
+  const lenderRow = d.deal_type==='mortgage'?`
+    <div class="form-group"><label class="form-label">Lender</label>
+      <select class="form-input" id="eLender">
+        <option value="">-- Select Lender --</option>
+        ${lenderOpts}
+      </select>
+    </div>`:'';
   showModal(`
     <div class="modal-handle"></div>
     <div class="modal-title">✏️ Edit Deal</div>
+    <div class="form-group">
+      <label class="form-label">Status</label>
+      <select class="form-input" id="eStage" onchange="toggleCoeRow(${id})">
+        ${stageOpts}
+      </select>
+    </div>
     <div class="form-group">
       <label class="form-label">Property Address</label>
       <div class="ac-wrap">
@@ -481,35 +503,68 @@ function openEdit(id) {
     <div class="form-group"><label class="form-label">Client Name</label><input class="form-input" id="eClient" value="${d.client_name||''}"></div>
     <div class="form-row">
       <div class="form-group"><label class="form-label">${pLabel}</label><input class="form-input" id="ePrice" type="number" value="${price}"></div>
-      <div class="form-group"><label class="form-label">COE Date</label><input class="form-input" id="eCoe" type="date" value="${d.coe_date||''}"></div>
+      <div class="form-group" id="eCoeRow"><label class="form-label" id="eCoeLabel">COE Date</label><input class="form-input" id="eCoe" type="date" value="${d.coe_date||''}"></div>
     </div>
+    ${lenderRow}
+    <div class="form-group"><label class="form-label">Escrow Company</label><input class="form-input" id="eEscrow" value="${d.escrow_company||''}" placeholder="Optional"></div>
+    ${d.deal_type==='re'?`
+    <div class="form-group"><label class="form-label">Representation</label>
+      <select class="form-input" id="eRep">
+        <option value="">-- Select --</option>
+        <option value="Buyer" ${d.representation==='Buyer'?'selected':''}>Buyer</option>
+        <option value="Seller" ${d.representation==='Seller'?'selected':''}>Seller</option>
+        <option value="Dual" ${d.representation==='Dual'?'selected':''}>Dual</option>
+      </select>
+    </div>`:''}
     <div class="form-group"><label class="form-label">Notes</label><textarea class="form-input" id="eNotes" rows="3" style="resize:vertical">${d.notes||''}</textarea></div>
     <div class="modal-actions">
       <button class="btn btn-outline" onclick="openDetail(${id})">Cancel</button>
       <button class="btn" onclick="saveEdit(${id})">Save Changes</button>
     </div>
   `);
+  toggleCoeRow(${id});
+}
+
+function toggleCoeRow(id) {
+  const stage = document.getElementById('eStage')?.value;
+  const coeRow = document.getElementById('eCoeRow');
+  const coeLabel = document.getElementById('eCoeLabel');
+  if (!coeRow) return;
+  if (stage === 'active_listing') {
+    coeRow.style.display = 'none';
+  } else {
+    coeRow.style.display = '';
+    if (coeLabel) coeLabel.textContent = stage === 'closed' ? 'COE Date *' : 'Est. COE Date';
+  }
 }
 
 async function saveEdit(id) {
   const d = deals.find(x=>x.id===id); if(!d) return;
+  const stage = document.getElementById('eStage').value;
   const addr = document.getElementById('eAddr').value.trim();
   const client = document.getElementById('eClient').value.trim();
   const price = document.getElementById('ePrice').value;
-  const coe = document.getElementById('eCoe').value;
+  const coe = stage === 'active_listing' ? '' : (document.getElementById('eCoe').value || '');
   const notes = document.getElementById('eNotes').value.trim();
+  const lender = document.getElementById('eLender')?.value || d.submitted_to || '';
+  const escrow = document.getElementById('eEscrow')?.value.trim() || '';
+  const rep = document.getElementById('eRep')?.value || d.representation || '';
+  if (stage === 'closed' && !coe) { toast('Please enter a COE date for closed deals.', 'err'); return; }
   const pf = d.deal_type==='mortgage'?{loan_amount:price}:{sales_price:price};
   const { error } = await sb.from('portal_deals').update({
-    property_address:addr, client_name:client, ...pf, coe_date:coe||null, notes, last_synced_at:new Date().toISOString()
+    stage, property_address:addr, client_name:client, ...pf, coe_date:coe||null, notes,
+    submitted_to: lender || null, escrow_company: escrow || null,
+    representation: rep || null, last_synced_at:new Date().toISOString()
   }).eq('id',id);
   if (error) { toast('Error: '+error.message,'err'); return; }
   fetch(WEBHOOK,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({
     form_type:'portal_edit', tasklet_deal_id:d.tasklet_id, portal_deal_id:id,
     agent_name:d.agent_name, agent_email:d.agent_email,
-    property_address:addr, client_name:client, price, coe_date:coe, notes, deal_type:d.deal_type
+    property_address:addr, client_name:client, price, coe_date:coe, notes,
+    deal_type:d.deal_type, stage, lender, escrow_company:escrow, representation:rep
   })}).catch(()=>{});
   const idx = deals.findIndex(x=>x.id===id);
-  deals[idx] = {...d, property_address:addr, client_name:client, ...pf, coe_date:coe, notes};
+  deals[idx] = {...d, stage, property_address:addr, client_name:client, ...pf, coe_date:coe||null, notes, submitted_to:lender, escrow_company:escrow, representation:rep||d.representation};
   closeModal(); toast('✅ Saved! Your broker has been notified.','ok');
   renderOverview(); renderDeals();
 }
