@@ -385,16 +385,48 @@ function renderOverview() {
   const yrs = new Date(yr,0,1);
   const active = deals.filter(d=>d.stage==='active_listing').length;
   const escrow = deals.filter(d=>d.stage==='in_escrow').length;
-  const closed = deals.filter(d=>d.stage==='closed'&&new Date(d.coe_date)>=yrs).length;
-  const pipe = deals.filter(d=>d.stage==='in_escrow').reduce((s,d)=>s+parseFloat(d.loan_amount||d.sales_price||0),0);
+  const closedYTD = deals.filter(d=>d.stage==='closed'&&new Date(d.coe_date||0)>=yrs);
+  const closed = closedYTD.length;
+  const ytdEarned = closedYTD.reduce((s,d)=>s+parseFloat(d.gross_commission||0),0);
+  const escrowDeals = deals.filter(d=>d.stage==='in_escrow');
+  const pipelineProj = escrowDeals.reduce((s,d)=>{
+    const price=parseFloat(d.deal_type==='mortgage'?d.loan_amount:d.sales_price)||0;
+    const pct=parseFloat(d.lo_comp_pct)||0;
+    return s+(price&&pct?Math.round(price*pct/100):0);
+  },0);
+  const totalProj = ytdEarned + pipelineProj;
+  const myGoal = goals.find(g=>g.target_year===yr&&g.goal_type==='annual_gross');
+  const goalAmt = myGoal?parseFloat(myGoal.target_amount):0;
   document.getElementById('sActive').textContent = active;
   document.getElementById('sEscrow').textContent = escrow;
   document.getElementById('sClosed').textContent = closed;
-  document.getElementById('sPipeline').textContent = pipe>0?'$'+Math.round(pipe/1000)+'K':'—';
-  const comm = deals.reduce((s,d)=>s+parseFloat(d.gross_commission||0),0);
-  if (comm>0) {
-    document.getElementById('commCard').style.display='block';
-    document.getElementById('commTotal').textContent='$'+comm.toLocaleString('en-US',{minimumFractionDigits:0,maximumFractionDigits:0});
+  document.getElementById('sPipeline').textContent = pipelineProj>0?'~$'+Math.round(pipelineProj/1000)+'K proj':'—';
+  const commCard = document.getElementById('commCard');
+  commCard.style.display='block';
+  const earnedPct = goalAmt>0?Math.min(100,Math.round(ytdEarned/goalAmt*100)):0;
+  const projPct = goalAmt>0?Math.min(100,Math.round(totalProj/goalAmt*100)):0;
+  const goalBar = goalAmt>0?`
+    <div style="margin-top:14px">
+      <div style="display:flex;justify-content:space-between;font-size:11px;color:#94a3b8;margin-bottom:6px"><span>Goal progress</span><span>${projPct}% projected</span></div>
+      <div style="background:rgba(255,255,255,0.08);border-radius:8px;height:10px;overflow:hidden;position:relative">
+        <div style="position:absolute;left:0;top:0;height:100%;width:${projPct}%;background:rgba(99,102,241,0.25);border-radius:8px"></div>
+        <div style="position:absolute;left:0;top:0;height:100%;width:${earnedPct}%;background:linear-gradient(90deg,#6366f1,#a855f7);border-radius:8px"></div>
+      </div>
+      <div style="font-size:11px;color:#64748b;margin-top:5px">Goal: $${goalAmt.toLocaleString()}</div>
+    </div>`:'';
+  if (ytdEarned>0||pipelineProj>0) {
+    commCard.innerHTML=`
+      <div style="display:flex;justify-content:space-around;gap:12px;flex-wrap:wrap">
+        <div><div class="commission-amount" style="font-size:26px">$${Math.round(ytdEarned).toLocaleString()}</div><div class="commission-label">✅ YTD Earned</div></div>
+        ${pipelineProj>0?`<div style="opacity:0.85"><div class="commission-amount" style="font-size:26px;color:#818cf8">+$${Math.round(pipelineProj).toLocaleString()}</div><div class="commission-label">📬 In Pipeline</div></div>`:''}
+        ${totalProj>ytdEarned?`<div><div class="commission-amount" style="font-size:26px;color:#a78bfa">$${Math.round(totalProj).toLocaleString()}</div><div class="commission-label">🎯 Total Projected</div></div>`:''}
+      </div>
+      ${goalBar}`;
+  } else {
+    commCard.innerHTML=`
+      <div class="commission-amount">$0</div>
+      <div class="commission-label">No commission recorded yet</div>
+      <div style="font-size:12px;color:#64748b;margin-top:8px">Add comp % to in-escrow deals to see projections</div>`;
   }
   const el = document.getElementById('recentList');
   const recent = deals.slice(0,3);
@@ -407,6 +439,12 @@ function renderDeals() {
   document.getElementById('dealsList').innerHTML = list.length ? list.map(dealCard).join('') : emptyState('📭','No deals in this category');
 }
 
+function projComm(d) {
+  const price = parseFloat(d.deal_type==="mortgage"?d.loan_amount:d.sales_price)||0;
+  const pct = parseFloat(d.lo_comp_pct)||0;
+  if (!price || !pct) return null;
+  return Math.round(price * pct / 100);
+}
 function dealCard(d) {
   const sl = {active_listing:'🟢 Active',in_escrow:'🟡 Escrow',closed:'✅ Closed',pre_approved:'🔵 Pre-Approved'}[d.stage]||d.stage;
   const sc = {active_listing:'chip-active',in_escrow:'chip-escrow',closed:'chip-closed'}[d.stage]||'';
@@ -415,6 +453,12 @@ function dealCard(d) {
   const price = parseFloat(d.deal_type==='mortgage'?d.loan_amount:d.sales_price)||0;
   const priceStr = price?'$'+price.toLocaleString():'';
   const coe = d.coe_date ? new Date(d.coe_date+'T00:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric'}):'';
+  const proj = projComm(d);
+  const commChip = d.stage==='closed' && d.gross_commission
+    ? `<span class="chip" style="background:rgba(16,185,129,0.15);color:#10b981;font-weight:700">✅ $${Math.round(parseFloat(d.gross_commission)).toLocaleString()} earned</span>`
+    : proj && d.stage!=='active_listing'
+      ? `<span class="chip" style="background:rgba(99,102,241,0.15);color:#818cf8;font-weight:700">💰 ~$${proj.toLocaleString()}</span>`
+      : '';
   return `<div class="deal-card" onclick="openDetail(${d.id})">
     <div class="deal-header"><div class="deal-address">${addr}</div>${tb}</div>
     <div class="deal-client">${d.client_name||'Client TBD'}${d.representation?' · '+d.representation:''}</div>
@@ -422,6 +466,7 @@ function dealCard(d) {
       <span class="chip ${sc}">${sl}</span>
       ${priceStr?`<span class="chip">${priceStr}</span>`:''}
       ${coe?`<span class="chip">COE ${coe}</span>`:''}
+      ${commChip}
       ${d.breakdown_sent?'<span class="chip chip-done">✅ Breakdown Sent</span>':''}
     </div>
   </div>`;
@@ -451,7 +496,13 @@ function openDetail(id) {
       <div class="detail-item"><div class="label">${coeLabel}</div><div class="value">${coeVal}</div></div>
       ${d.escrow_company?`<div class="detail-item"><div class="label">Escrow</div><div class="value">${d.escrow_company}</div></div>`:''}
       ${d.submitted_to?`<div class="detail-item"><div class="label">Lender</div><div class="value">${d.submitted_to}</div></div>`:''}
-      ${d.gross_commission?`<div class="detail-item"><div class="label">Commission</div><div class="value c-accent">$${parseFloat(d.gross_commission).toLocaleString()}</div></div>`:''}
+      ${(()=>{
+        if(d.gross_commission) return `<div class="detail-item"><div class="label">✅ Earned Commission</div><div class="value" style="color:#10b981;font-weight:700">$${parseFloat(d.gross_commission).toLocaleString()}</div></div>`;
+        const pr=parseFloat(d.deal_type==='mortgage'?d.loan_amount:d.sales_price)||0;
+        const pc=parseFloat(d.lo_comp_pct)||0;
+        const proj2=pr&&pc?Math.round(pr*pc/100):0;
+        return proj2?`<div class="detail-item"><div class="label">💰 Projected Commission</div><div class="value" style="color:#818cf8;font-size:20px;font-weight:800">~$${proj2.toLocaleString()}</div><div style="font-size:12px;color:#64748b;margin-top:2px">${pc}% of $${pr.toLocaleString()}</div></div>`:'';
+      })()}
     </div>
     ${d.notes?`<div style="margin-bottom:14px"><div class="form-label">Notes</div><div style="font-size:14px;color:#94a3b8;white-space:pre-wrap">${d.notes}</div></div>`:''}
     <div class="action-row">
@@ -477,6 +528,9 @@ function openEdit(id) {
     {v:'closed',l:'✅ Closed'}
   ].map(o=>`<option value="${o.v}" ${d.stage===o.v?'selected':''}>${o.l}</option>`).join('');
   const lenderOpts = LENDERS.map(l=>`<option value="${l}" ${d.submitted_to===l?'selected':''}>${l}</option>`).join('');
+  const compPct = parseFloat(d.lo_comp_pct)||'';
+  const priceForCalc = parseFloat(d.deal_type==='mortgage'?d.loan_amount:d.sales_price)||0;
+  const projPreview = compPct && priceForCalc ? '~$'+Math.round(priceForCalc*compPct/100).toLocaleString() : '—';
   const lenderRow = d.deal_type==='mortgage'?`
     <div class="form-group"><label class="form-label">Lender</label>
       <select class="form-input" id="eLender">
@@ -484,6 +538,29 @@ function openEdit(id) {
         ${lenderOpts}
       </select>
     </div>`:'';
+  const compAmt = compPct && priceForCalc ? Math.round(priceForCalc * compPct / 100) : '';
+  const compRow = `
+    <div class="form-group">
+      <label class="form-label" style="font-weight:700;color:#818cf8">💰 Expected Commission</label>
+      <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+        <div style="flex:1;min-width:120px">
+          <label style="font-size:11px;color:#94a3b8;margin-bottom:4px;display:block">Amount ($)</label>
+          <input class="form-input" id="eCompAmt" type="number" step="1" min="0"
+            value="${compAmt}" placeholder="e.g. 9750"
+            oninput="syncCompFromAmt(${priceForCalc})">
+        </div>
+        <div style="color:#64748b;font-size:18px;padding-top:18px">⇄</div>
+        <div style="flex:1;min-width:100px">
+          <label style="font-size:11px;color:#94a3b8;margin-bottom:4px;display:block">Percentage (%)</label>
+          <input class="form-input" id="eCompPct" type="number" step="0.001" min="0" max="10"
+            value="${compPct}" placeholder="e.g. 2.5"
+            oninput="syncCompFromPct(${priceForCalc})">
+        </div>
+      </div>
+      <div style="font-size:11px;color:#64748b;margin-top:6px">
+        Based on ${pLabel}: <strong style="color:#c4b5fd">${priceForCalc ? '$' + priceForCalc.toLocaleString() : 'enter amount above'}</strong>
+      </div>
+    </div>`;
   showModal(`
     <div class="modal-handle"></div>
     <div class="modal-title">✏️ Edit Deal</div>
@@ -516,13 +593,36 @@ function openEdit(id) {
         <option value="Dual" ${d.representation==='Dual'?'selected':''}>Dual</option>
       </select>
     </div>`:''}
+    ${compRow}
     <div class="form-group"><label class="form-label">Notes</label><textarea class="form-input" id="eNotes" rows="3" style="resize:vertical">${d.notes||''}</textarea></div>
     <div class="modal-actions">
       <button class="btn btn-outline" onclick="openDetail(${id})">Cancel</button>
       <button class="btn" onclick="saveEdit(${id})">Save Changes</button>
     </div>
   `);
-  toggleCoeRow(${id});
+  toggleCoeRow(id);
+}
+
+function syncCompFromPct(basePrice) {
+  const pct = parseFloat(document.getElementById('eCompPct')?.value)||0;
+  const amtEl = document.getElementById('eCompAmt');
+  if (!amtEl) return;
+  if (pct && basePrice) {
+    amtEl.value = Math.round(basePrice * pct / 100);
+  } else {
+    amtEl.value = '';
+  }
+}
+
+function syncCompFromAmt(basePrice) {
+  const amt = parseFloat(document.getElementById('eCompAmt')?.value)||0;
+  const pctEl = document.getElementById('eCompPct');
+  if (!pctEl) return;
+  if (amt && basePrice) {
+    pctEl.value = (amt / basePrice * 100).toFixed(3);
+  } else {
+    pctEl.value = '';
+  }
 }
 
 function toggleCoeRow(id) {
@@ -549,22 +649,30 @@ async function saveEdit(id) {
   const lender = document.getElementById('eLender')?.value || d.submitted_to || '';
   const escrow = document.getElementById('eEscrow')?.value.trim() || '';
   const rep = document.getElementById('eRep')?.value || d.representation || '';
+  // Read bidirectional comp fields
+  const rawCompAmt = parseFloat(document.getElementById('eCompAmt')?.value)||0;
+  const rawCompPct = parseFloat(document.getElementById('eCompPct')?.value)||0;
+  const priceNum = parseFloat(price)||0;
+  // Derive lo_comp_pct: prefer direct pct entry, else derive from amount
+  const loCompPct = rawCompPct || (rawCompAmt && priceNum ? parseFloat((rawCompAmt/priceNum*100).toFixed(4)) : null);
   if (stage === 'closed' && !coe) { toast('Please enter a COE date for closed deals.', 'err'); return; }
   const pf = d.deal_type==='mortgage'?{loan_amount:price}:{sales_price:price};
   const { error } = await sb.from('portal_deals').update({
     stage, property_address:addr, client_name:client, ...pf, coe_date:coe||null, notes,
     submitted_to: lender || null, escrow_company: escrow || null,
-    representation: rep || null, last_synced_at:new Date().toISOString()
+    representation: rep || null, lo_comp_pct: loCompPct || null,
+    last_synced_at:new Date().toISOString()
   }).eq('id',id);
   if (error) { toast('Error: '+error.message,'err'); return; }
   fetch(WEBHOOK,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({
     form_type:'portal_edit', tasklet_deal_id:d.tasklet_id, portal_deal_id:id,
     agent_name:d.agent_name, agent_email:d.agent_email,
     property_address:addr, client_name:client, price, coe_date:coe, notes,
-    deal_type:d.deal_type, stage, lender, escrow_company:escrow, representation:rep
+    deal_type:d.deal_type, stage, lender, escrow_company:escrow, representation:rep,
+    lo_comp_pct: loCompPct
   })}).catch(()=>{});
   const idx = deals.findIndex(x=>x.id===id);
-  deals[idx] = {...d, stage, property_address:addr, client_name:client, ...pf, coe_date:coe||null, notes, submitted_to:lender, escrow_company:escrow, representation:rep||d.representation};
+  deals[idx] = {...d, stage, property_address:addr, client_name:client, ...pf, coe_date:coe||null, notes, submitted_to:lender, escrow_company:escrow, representation:rep||d.representation, lo_comp_pct:loCompPct};
   closeModal(); toast('✅ Saved! Your broker has been notified.','ok');
   renderOverview(); renderDeals();
 }
@@ -733,10 +841,19 @@ function renderGoals() {
   const ytdGross = closedDeals.reduce((s,d)=>s+parseFloat(d.gross_commission||0),0);
   const ytdLoans = closedDeals.filter(d=>d.deal_type==='mortgage').length;
   const ytdDeals = closedDeals.length;
+  const pipeProj = deals.filter(d=>d.stage==='in_escrow').reduce((s,d)=>{
+    const price=parseFloat(d.deal_type==='mortgage'?d.loan_amount:d.sales_price)||0;
+    const p2=parseFloat(d.lo_comp_pct)||0;
+    return s+(price&&p2?Math.round(price*p2/100):0);
+  },0);
+  const escrowMtg = deals.filter(d=>d.stage==='in_escrow'&&d.deal_type==='mortgage').length;
+  const escrowAll = deals.filter(d=>d.stage==='in_escrow').length;
 
   el.innerHTML = myGoals.map(g=>{
     const actual = g.goal_type==='annual_gross'?ytdGross:g.goal_type==='loan_count'?ytdLoans:ytdDeals;
+    const projected = g.goal_type==='annual_gross'?(ytdGross+pipeProj):g.goal_type==='loan_count'?(ytdLoans+escrowMtg):(ytdDeals+escrowAll);
     const pct = g.target_amount>0?Math.min(100,Math.round(actual/g.target_amount*100)):0;
+    const projPct2 = g.target_amount>0?Math.min(100,Math.round(projected/g.target_amount*100)):0;
     const label = {annual_gross:'Annual Gross Commission',loan_count:'Loans Funded',deal_count:'Total Deals Closed'}[g.goal_type]||g.goal_type;
     const actualFmt = g.goal_type==='annual_gross'?'$'+actual.toLocaleString():actual;
     const targetFmt = g.goal_type==='annual_gross'?'$'+parseFloat(g.target_amount).toLocaleString():g.target_amount;
@@ -752,11 +869,15 @@ function renderGoals() {
           <button onclick="deleteGoal(${g.id})" style="background:none;border:none;cursor:pointer;color:#64748b;font-size:14px;padding:2px 4px">🗑️</button>
         </div>
       </div>
-      <div class="goal-progress"><div class="goal-bar" style="width:${pct}%"></div></div>
-      <div style="display:flex;justify-content:space-between">
-        <span class="goal-pct">${actualFmt} so far</span>
+      <div class="goal-progress" style="position:relative">
+        <div style="position:absolute;left:0;top:0;height:100%;width:${projPct2}%;background:rgba(99,102,241,0.2);border-radius:20px"></div>
+        <div class="goal-bar" style="width:${pct}%;position:relative;z-index:1"></div>
+      </div>
+      <div style="display:flex;justify-content:space-between;margin-bottom:4px">
+        <span class="goal-pct">${actualFmt} earned</span>
         <span class="goal-pct">Target: ${targetFmt}</span>
       </div>
+      ${projected>actual?`<div style="font-size:12px;color:#818cf8;font-weight:600">📬 With pipeline: ${g.goal_type==='annual_gross'?'$'+Math.round(projected).toLocaleString():projected} (${projPct2}% of goal)</div>`:''}
       ${g.notes?`<div style="font-size:12px;color:#64748b;margin-top:6px;font-style:italic">"${g.notes}"</div>`:''}
     </div>`;
   }).join('') + `<div style="font-size:12px;color:#64748b;text-align:center;margin-top:4px;">Your broker can see your goals</div>`;
