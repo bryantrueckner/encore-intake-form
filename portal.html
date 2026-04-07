@@ -176,11 +176,12 @@
       <button class="logout-btn" onclick="logout()">Sign Out</button>
     </div>
   </div>
-  <div class="nav-tabs">
+  <div class="nav-tabs" id="mainNavTabs">
     <div class="nav-tab active" onclick="goTab('overview')" id="tab-overview">📊 Overview</div>
     <div class="nav-tab" onclick="goTab('deals')" id="tab-deals">📋 My Deals</div>
     <div class="nav-tab" onclick="goTab('goals')" id="tab-goals">🎯 Goals</div>
     <div class="nav-tab" onclick="goTab('requests')" id="tab-requests">📬 Requests <span id="reqBadge" style="display:none;background:#ef4444;color:white;border-radius:10px;padding:1px 7px;font-size:10px;margin-left:4px;vertical-align:middle;"></span></div>
+    <div class="nav-tab" onclick="goTab('allagents')" id="tab-allagents" style="display:none">👥 All Agents</div>
   </div>
 
   <!-- OVERVIEW -->
@@ -227,6 +228,11 @@
   <div id="view-requests" class="content" style="display:none">
     <div class="section-title">My Change Requests</div>
     <div id="reqList"></div>
+  </div>
+
+  <div id="view-allagents" class="content" style="display:none">
+    <div class="section-title">👥 All Agents</div>
+    <div id="allAgentsList"></div>
   </div>
 
   <button class="fab" onclick="openAdd()">+</button>
@@ -344,6 +350,11 @@ async function boot() {
   document.getElementById('agentPill').textContent = first;
   document.getElementById('greeting').textContent = `Hello, ${first}! 👋`;
   await loadData();
+  // Show All Agents tab for admin (Bryant)
+  if (user.email === 'bryant@encoremtg.com') {
+    const adminTab = document.getElementById('tab-allagents');
+    if (adminTab) adminTab.style.display = 'block';
+  }
   renderOverview(); renderDeals(); renderReqs();
 }
 
@@ -351,7 +362,7 @@ let goals = [];
 
 async function loadData() {
   const [{ data: d }, { data: r }, { data: g }] = await Promise.all([
-    sb.from('portal_deals').select('*').eq('agent_email', user.email).order('created_at',{ascending:false}),
+    sb.from('portal_deals').select('*').order('created_at',{ascending:false}),
     sb.from('portal_change_requests').select('*').order('requested_at',{ascending:false}),
     sb.from('portal_goals').select('*').order('created_at',{ascending:false})
   ]);
@@ -366,11 +377,15 @@ async function loadData() {
 
 // ── TABS ──────────────────────────────────────────
 function goTab(t) {
-  ['overview','deals','goals','requests'].forEach(v=>{
-    document.getElementById(`view-${v}`).style.display = v===t?'block':'none';
-    document.getElementById(`tab-${v}`).classList.toggle('active',v===t);
+  const tabs = ['overview','deals','goals','requests','allagents'];
+  tabs.forEach(v=>{
+    const vEl = document.getElementById(`view-${v}`);
+    const tEl = document.getElementById(`tab-${v}`);
+    if (vEl) vEl.style.display = v===t?'block':'none';
+    if (tEl) tEl.classList.toggle('active',v===t);
   });
   if (t==='goals') renderGoals();
+  if (t==='allagents') renderAllAgents();
 }
 function setFilter(f) {
   filter = f;
@@ -381,14 +396,15 @@ function setFilter(f) {
 
 // ── RENDER OVERVIEW ───────────────────────────────
 function renderOverview() {
+  const myDeals = deals.filter(d=>d.agent_email===user.email);
   const yr = new Date().getFullYear();
   const yrs = new Date(yr,0,1);
-  const active = deals.filter(d=>d.stage==='active_listing').length;
-  const escrow = deals.filter(d=>d.stage==='in_escrow').length;
-  const closedYTD = deals.filter(d=>d.stage==='closed'&&new Date(d.coe_date||0)>=yrs);
+  const active = myDeals.filter(d=>d.stage==='active_listing').length;
+  const escrow = myDeals.filter(d=>d.stage==='in_escrow').length;
+  const closedYTD = myDeals.filter(d=>d.stage==='closed'&&new Date(d.coe_date||0)>=yrs);
   const closed = closedYTD.length;
   const ytdEarned = closedYTD.reduce((s,d)=>s+parseFloat(d.gross_commission||0),0);
-  const escrowDeals = deals.filter(d=>d.stage==='in_escrow');
+  const escrowDeals = myDeals.filter(d=>d.stage==='in_escrow');
   const pipelineProj = escrowDeals.reduce((s,d)=>{
     const price=parseFloat(d.deal_type==='mortgage'?d.loan_amount:d.sales_price)||0;
     const pct=parseFloat(d.lo_comp_pct)||0;
@@ -429,14 +445,45 @@ function renderOverview() {
       <div style="font-size:12px;color:#64748b;margin-top:8px">Add comp % to in-escrow deals to see projections</div>`;
   }
   const el = document.getElementById('recentList');
-  const recent = deals.slice(0,3);
+  const recent = myDeals.slice(0,3);
   el.innerHTML = recent.length ? recent.map(dealCard).join('') : emptyState('📋','No deals yet');
 }
 
 // ── RENDER DEALS ──────────────────────────────────
 function renderDeals() {
-  const list = filter==='all'?deals:deals.filter(d=>d.stage===filter);
+  const myDeals = deals.filter(d=>d.agent_email===user.email);
+  const list = filter==='all'?myDeals:myDeals.filter(d=>d.stage===filter);
   document.getElementById('dealsList').innerHTML = list.length ? list.map(dealCard).join('') : emptyState('📭','No deals in this category');
+}
+
+// ── RENDER ALL AGENTS (admin only) ────────────────
+function renderAllAgents() {
+  const byAgent = {};
+  deals.forEach(d=>{
+    const key = d.agent_name||d.agent_email||'Unknown';
+    if (!byAgent[key]) byAgent[key]={email:d.agent_email,deals:[]};
+    byAgent[key].deals.push(d);
+  });
+  const el = document.getElementById('allAgentsList');
+  if (!el) return;
+  const html = Object.entries(byAgent).sort((a,b)=>a[0].localeCompare(b[0])).map(([name,info])=>{
+    const closed = info.deals.filter(d=>d.stage==='closed').length;
+    const escrow = info.deals.filter(d=>d.stage==='in_escrow').length;
+    const active = info.deals.filter(d=>d.stage==='active_listing').length;
+    const ytdGross = info.deals.filter(d=>d.stage==='closed').reduce((s,d)=>s+parseFloat(d.gross_commission||0),0);
+    return `<div style="background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);border-radius:12px;padding:16px;margin-bottom:12px">
+      <div style="font-weight:600;font-size:15px;margin-bottom:4px">${name}</div>
+      <div style="font-size:12px;color:#94a3b8;margin-bottom:10px">${info.email}</div>
+      <div style="display:flex;gap:16px;flex-wrap:wrap;font-size:13px">
+        ${active?`<span>🟢 ${active} Active</span>`:''}
+        ${escrow?`<span>🟡 ${escrow} Escrow</span>`:''}
+        ${closed?`<span>✅ ${closed} Closed</span>`:''}
+        ${ytdGross?`<span style="color:#a78bfa">💰 $${Math.round(ytdGross).toLocaleString()} YTD</span>`:''}
+      </div>
+      <div style="margin-top:10px">${info.deals.map(dealCard).join('')}</div>
+    </div>`;
+  }).join('');
+  el.innerHTML = html || emptyState('📭','No deals found');
 }
 
 function projComm(d) {
