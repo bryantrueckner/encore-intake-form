@@ -142,6 +142,13 @@
     .error-msg { color: #c62828; font-size: 14px; margin-top: 8px; display: none; }
 
     .divider { border: none; border-top: 1px solid #eee; margin: 20px 0; }
+    @media (max-width: 500px) {
+      body { padding: 12px; }
+      .status-buttons { flex-direction: column; }
+      .status-btn { font-size: 15px; padding: 14px; }
+      .field-row { grid-template-columns: 1fr !important; }
+      .card { padding: 18px; }
+    }
   </style>
 </head>
 <body>
