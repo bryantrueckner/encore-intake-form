@@ -21,6 +21,7 @@
     .login-brand { font-size: 28px; font-weight: 800; letter-spacing: -0.5px; margin-bottom: 4px; }
     .login-brand span { color: var(--accent2); }
     .login-sub { font-size: 13px; color: var(--text2); margin-bottom: 28px; }
+    .login-version { font-size: 11px; color: rgba(255,255,255,0.2); margin-top: 16px; }
     .input { width: 100%; background: rgba(255,255,255,0.05); border: 1px solid var(--border); border-radius: 12px; padding: 13px 16px; font-size: 16px; color: var(--text); margin-bottom: 12px; outline: none; }
     .input:focus { border-color: var(--accent); }
     .btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; background: var(--accent); color: white; border: none; border-radius: 12px; padding: 13px 20px; font-size: 15px; font-weight: 600; cursor: pointer; width: 100%; }
@@ -154,13 +155,15 @@
     <div id="loginForm">
       <input type="email" class="input" id="loginEmail" placeholder="your@email.com" autocomplete="email" onkeydown="if(event.key==='Enter')sendLink()">
       <button class="btn" onclick="sendLink()" id="loginBtn">✉️ Send Login Link</button>
-      <div id="loginErr" style="display:none;color:#ef4444;font-size:13px;margin-top:10px;"></div>
+      <div id="loginErr" style="display:none;color:#ef4444;font-size:13px;margin-top:10px;padding:10px;background:rgba(239,68,68,0.1);border-radius:8px;text-align:left;"></div>
     </div>
     <div id="loginSent" style="display:none;text-align:center">
       <div style="font-size:48px;margin-bottom:12px;">📬</div>
       <div style="font-size:16px;font-weight:700;margin-bottom:8px;">Check your email!</div>
       <div style="font-size:13px;color:#94a3b8;">Login link sent to <strong id="sentEmail" style="color:#e2e8f0"></strong>.<br>Click it to access your portal.</div>
+      <button class="btn btn-outline btn-sm" style="margin-top:16px;width:auto;padding:10px 20px;" onclick="document.getElementById('loginSent').style.display='none';document.getElementById('loginForm').style.display='block';">← Try again</button>
     </div>
+    <div class="login-version">v2.1 — Apr 2026</div>
   </div>
 </div>
 
@@ -253,20 +256,33 @@ let acResults = {};
 let acTimer = null;
 
 // ── INIT ──────────────────────────────────────────
+function showLogin() {
+  document.getElementById('loginScreen').style.display = 'flex';
+  document.getElementById('app').style.display = 'none';
+}
+function showApp() {
+  document.getElementById('loginScreen').style.display = 'none';
+  document.getElementById('app').style.display = 'block';
+}
+
 async function init() {
   document.getElementById('todayDate').textContent = new Date().toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric'});
+  // Check if Supabase loaded
+  if (typeof supabase === 'undefined' || !sb) {
+    showLoginErr('Could not load auth library. Please refresh the page.');
+    return;
+  }
   try {
     const { data:{ session }, error } = await sb.auth.getSession();
-    if (error) { showLoginErr('Auth error: ' + error.message); show('loginScreen'); return; }
+    if (error) { showLoginErr('Auth error: ' + error.message); return; }
     if (session) { user = session.user; await boot(); }
-    else { show('loginScreen'); }
+    // else: loginScreen already showing via CSS
     sb.auth.onAuthStateChange(async (ev, sess) => {
       if (ev === 'SIGNED_IN' && sess) { user = sess.user; await boot(); }
-      else if (ev === 'SIGNED_OUT') { show('loginScreen'); hide('app'); }
+      else if (ev === 'SIGNED_OUT') { showLogin(); }
     });
   } catch(e) {
-    showLoginErr('Could not initialize: ' + (e.message || 'Unknown error'));
-    show('loginScreen');
+    showLoginErr('Init error: ' + (e.message || 'Could not connect. Check your connection.'));
   }
 }
 
@@ -275,12 +291,18 @@ async function sendLink() {
   const email = document.getElementById('loginEmail').value.trim();
   if (!email) { showLoginErr('Please enter your email address.'); return; }
   const btn = document.getElementById('loginBtn');
-  btn.disabled = true; btn.textContent = 'Sending…';
+  btn.disabled = true; btn.textContent = '⏳ Sending…';
+  document.getElementById('loginErr').style.display = 'none';
   try {
-    const redirectTo = window.location.origin + window.location.pathname;
-    const { error } = await sb.auth.signInWithOtp({ email, options:{ emailRedirectTo: redirectTo }});
+    const redirectTo = 'https://bryantrueckner.github.io/encore-intake-form/portal.html';
+    const { error } = await sb.auth.signInWithOtp({ email, options:{ emailRedirectTo: redirectTo, shouldCreateUser: false }});
     if (error) {
-      showLoginErr(error.message);
+      // If user doesn't exist, try creating them
+      if (error.message && error.message.toLowerCase().includes('not found')) {
+        showLoginErr('This email is not registered. Contact Bryant to get access.');
+      } else {
+        showLoginErr('⚠️ ' + error.message);
+      }
       btn.disabled=false; btn.textContent='✉️ Send Login Link';
     } else {
       document.getElementById('sentEmail').textContent = email;
@@ -288,7 +310,7 @@ async function sendLink() {
       document.getElementById('loginSent').style.display='block';
     }
   } catch(e) {
-    showLoginErr('Error: ' + (e.message || 'Could not connect to auth service. Check your connection.'));
+    showLoginErr('⚠️ Error: ' + (e.message || 'Could not connect. Check your internet connection.'));
     btn.disabled=false; btn.textContent='✉️ Send Login Link';
   }
 }
@@ -298,11 +320,11 @@ function showLoginErr(msg) {
   el.style.display='block'; el.textContent = msg;
 }
 
-async function logout() { await sb.auth.signOut(); show('loginScreen'); hide('app'); deals=[]; reqs=[]; }
+async function logout() { await sb.auth.signOut(); showLogin(); deals=[]; reqs=[]; }
 
 // ── BOOT ──────────────────────────────────────────
 async function boot() {
-  hide('loginScreen'); show('app');
+  showApp();
   const name = user.user_metadata?.full_name || user.email.split('@')[0];
   const first = name.split(' ')[0];
   document.getElementById('agentPill').textContent = first;
