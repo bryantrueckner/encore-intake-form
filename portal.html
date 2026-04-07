@@ -477,8 +477,10 @@ function openDetail(id) {
   const d = deals.find(x=>x.id===id); if(!d) return;
   const pending = reqs.filter(r=>r.deal_id===id&&r.status==='pending');
   const banners = pending.map(r=>`<div class="pending-banner">⏳ ${r.change_type==='delete'?'Deletion':'Cancellation'} request pending broker approval</div>`).join('');
+  const isPurchaseMtg = d.deal_type==='mortgage' && d.transaction_type==='purchase';
   const price = parseFloat(d.deal_type==='mortgage'?d.loan_amount:d.sales_price)||0;
   const pLabel = d.deal_type==='mortgage'?'Loan Amount':'Sales Price';
+  const salesPriceDisplay = isPurchaseMtg && d.sales_price ? parseFloat(d.sales_price) : null;
   const coeLabel = d.stage==='closed'?'COE Date':'Est. COE';
   const coeVal = d.coe_date?new Date(d.coe_date+'T00:00:00').toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric'}):'—';
   showModal(`
@@ -492,6 +494,7 @@ function openDetail(id) {
       <div class="detail-item"><div class="label">Client</div><div class="value">${d.client_name||'—'}</div></div>
       <div class="detail-item"><div class="label">Type</div><div class="value">${d.deal_type==='mortgage'?'🏦 Loan':'🏠 RE'}${d.representation?' · '+d.representation:''}</div></div>
       <div class="detail-item"><div class="label">Status</div><div class="value">${{active_listing:'🟢 Active',in_escrow:'🟡 Escrow',closed:'✅ Closed'}[d.stage]||d.stage}</div></div>
+      ${salesPriceDisplay ? `<div class="detail-item"><div class="label">Sales Price</div><div class="value">$${salesPriceDisplay.toLocaleString()}</div></div>` : ''}
       <div class="detail-item"><div class="label">${pLabel}</div><div class="value">${price?'$'+price.toLocaleString():'—'}</div></div>
       <div class="detail-item"><div class="label">${coeLabel}</div><div class="value">${coeVal}</div></div>
       ${d.escrow_company?`<div class="detail-item"><div class="label">Escrow</div><div class="value">${d.escrow_company}</div></div>`:''}
@@ -686,12 +689,17 @@ async function saveEdit(id) {
   fetch(WEBHOOK,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({
     form_type:'portal_edit', tasklet_deal_id:d.tasklet_id, portal_deal_id:id,
     agent_name:d.agent_name, agent_email:d.agent_email,
-    property_address:addr, client_name:client, price, coe_date:coe, notes,
+    property_address:addr, client_name:client,
+    loan_amount: d.deal_type==='mortgage' ? price : null,
+    sales_price: isPurchaseMortgage ? (salesPriceVal||null) : (d.deal_type==='re' ? price : null),
+    coe_date:coe, notes,
     deal_type:d.deal_type, stage, lender, escrow_company:escrow, representation:rep,
     lo_comp_pct: loCompPct, group_id: d.group_id
   })}).catch(()=>{});
   const idx = deals.findIndex(x=>x.id===id);
-  deals[idx] = {...d, stage, property_address:addr, client_name:client, ...pf, coe_date:coe||null, notes, submitted_to:lender, escrow_company:escrow, representation:rep||d.representation, lo_comp_pct:loCompPct};
+  deals[idx] = {...d, stage, property_address:addr, client_name:client, ...pf,
+    ...(isPurchaseMortgage && salesPriceVal ? {sales_price: salesPriceVal} : {}),
+    coe_date:coe||null, notes, submitted_to:lender, escrow_company:escrow, representation:rep||d.representation, lo_comp_pct:loCompPct};
   closeModal(); toast('✅ Saved! Your broker has been notified.','ok');
   renderOverview(); renderDeals();
 }
