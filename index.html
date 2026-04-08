@@ -178,6 +178,16 @@
       <!-- Loan Side Fields -->
       <div id="loanFields" class="hidden">
         <div class="section-label" id="loanSectionLabel">🏦 Loan Details</div>
+        
+        <!-- For Purchase deals: ask if loan is Purchase or Refinance -->
+        <div id="loanTypeQuestion" class="hidden" style="margin-bottom: 16px; padding: 12px; background: #f5f7ff; border-radius: 10px; border-left: 4px solid #4361ee;">
+          <p style="font-size: 13px; font-weight: 600; color: #444; margin-bottom: 8px;">Is this loan for a Purchase or Refinance?</p>
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+            <button type="button" id="loanType-purchase" onclick="selectLoanType('purchase')" style="padding: 10px; border: 2px solid #ddd; border-radius: 8px; background: white; cursor: pointer; font-size: 13px; font-weight: 600; color: #444; transition: all 0.15s;">🤝 Purchase</button>
+            <button type="button" id="loanType-refinance" onclick="selectLoanType('refinance')" style="padding: 10px; border: 2px solid #ddd; border-radius: 8px; background: white; cursor: pointer; font-size: 13px; font-weight: 600; color: #444; transition: all 0.15s;">🔄 Refinance</button>
+          </div>
+        </div>
+        
         <div class="field">
           <label class="required">Borrower Name</label>
           <input type="text" id="borrowerName" placeholder="Borrower full name">
@@ -363,6 +373,7 @@
 const WEBHOOK_URL = 'https://webhooks.tasklet.ai/v1/public/webhook?token=a24ab4497666842f788372230aaf5ff4';
 
 let txType = '';
+let loanType = ''; // Track whether loan is for purchase or refinance
 
 function selectTxType(type) {
   txType = type;
@@ -402,6 +413,17 @@ function toggleAddon(addon) {
   setTimeout(() => updateListingAddons(), 0);
 }
 
+function selectLoanType(type) {
+  loanType = type;
+  document.getElementById('loanType-purchase').style.borderColor = type === 'purchase' ? '#4361ee' : '#ddd';
+  document.getElementById('loanType-purchase').style.background = type === 'purchase' ? '#eef1ff' : 'white';
+  document.getElementById('loanType-purchase').style.color = type === 'purchase' ? '#4361ee' : '#444';
+  
+  document.getElementById('loanType-refinance').style.borderColor = type === 'refinance' ? '#4361ee' : '#ddd';
+  document.getElementById('loanType-refinance').style.background = type === 'refinance' ? '#eef1ff' : 'white';
+  document.getElementById('loanType-refinance').style.color = type === 'refinance' ? '#4361ee' : '#444';
+}
+
 function updateSides() {
   const loan   = document.getElementById('side-loan').checked;
   const buyer  = document.getElementById('side-buyer').checked;
@@ -417,6 +439,7 @@ function updateSides() {
   if (!anySelected) {
     detailsCard.classList.add('hidden');
     document.getElementById('submitBtn').classList.add('hidden');
+    loanType = '';
     return;
   }
 
@@ -433,6 +456,9 @@ function updateSides() {
   setHidden('clientContactSection', false);
   setHidden('propertyTypeSection', !(buyer || seller));
   setHidden('loanProgramSection',  !loan);
+  
+  // Show loanTypeQuestion only on Purchase deals when loan is checked
+  setHidden('loanTypeQuestion', !(loan && txType === 'purchase'));
 
   document.getElementById('loanSectionLabel').style.display = (buyer || seller) ? '' : 'none';
   document.getElementById('buyerNameLabel').textContent =
@@ -563,6 +589,9 @@ async function submitForm() {
     const buyer  = document.getElementById('side-buyer').checked;
     const seller = document.getElementById('side-seller').checked;
     if (!loan && !buyer && !seller) { alert('Please select at least one side.'); return; }
+    
+    // If loan is selected, user must choose Purchase or Refinance for the loan
+    if (loan && !loanType) { alert('Please specify if this loan is for a Purchase or Refinance.'); return; }
 
     const notes        = document.getElementById('notes').value.trim();
     const escrowCo     = document.getElementById('escrowCompany').value.trim();
@@ -588,7 +617,7 @@ async function submitForm() {
     try {
       if (loan) {
         await sendToWebhook({ ...base, deal_type: 'mortgage', deal_stage: 'in_escrow',
-          transaction_type: 'purchase', client_name: borrowerName, loan_amount: loanAmt,
+          transaction_type: loanType, client_name: borrowerName, loan_amount: loanAmt,
           representation: '', ...(loanProgram ? { loan_program: loanProgram } : {}) });
       }
       if (buyer) {
@@ -709,6 +738,15 @@ function resetForm() {
     if (c) c.classList.remove('checked','green');
   });
   txType = '';
+  loanType = '';
+  // Reset loan type buttons
+  document.getElementById('loanType-purchase').style.borderColor = '#ddd';
+  document.getElementById('loanType-purchase').style.background = 'white';
+  document.getElementById('loanType-purchase').style.color = '#444';
+  document.getElementById('loanType-refinance').style.borderColor = '#ddd';
+  document.getElementById('loanType-refinance').style.background = 'white';
+  document.getElementById('loanType-refinance').style.color = '#444';
+  
   document.getElementById('sidesCard').classList.add('hidden');
   document.getElementById('detailsCard').classList.add('hidden');
   document.getElementById('submitBtn').classList.add('hidden');
