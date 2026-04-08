@@ -1035,7 +1035,7 @@ async function saveEdit(id) {
       ? {loan_amount: price}
       : {sales_price: price};
   const { error } = await sb.from('portal_deals').update({
-    stage, property_address:addr, client_name:client, ...pf,
+    stage, status: stage, property_address:addr, client_name:client, ...pf,
     ...(isPurchaseMortgage && salesPriceVal ? {sales_price: salesPriceVal} : {}),
     coe_date:coe||null, notes,
     submitted_to: lender || null, escrow_company: escrow || null,
