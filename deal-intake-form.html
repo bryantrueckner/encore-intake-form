@@ -1,0 +1,810 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Encore - Deal Intake Form</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f0f2f5; min-height: 100vh; padding: 20px; }
+  .container { max-width: 600px; margin: 0 auto; }
+  .header { text-align: center; margin-bottom: 24px; }
+  .header h1 { font-size: 24px; color: #1a1a2e; margin-bottom: 4px; }
+  .header p { color: #666; font-size: 14px; }
+  .card { background: white; border-radius: 12px; padding: 24px; margin-bottom: 16px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+  .card h2 { font-size: 16px; color: #1a1a2e; margin-bottom: 16px; padding-bottom: 8px; border-bottom: 2px solid #eee; }
+  .field { margin-bottom: 14px; }
+  .field label { display: block; font-size: 13px; font-weight: 600; color: #444; margin-bottom: 4px; }
+  .field input, .field select, .field textarea { width: 100%; padding: 10px 12px; border: 1px solid #ddd; border-radius: 8px; font-size: 14px; font-family: inherit; transition: border-color 0.2s; background: white; }
+  .field input:focus, .field select:focus, .field textarea:focus { outline: none; border-color: #4361ee; box-shadow: 0 0 0 3px rgba(67,97,238,0.1); }
+  .field textarea { resize: vertical; min-height: 80px; }
+  .field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .required::after { content: ' *'; color: #e74c3c; }
+  .hidden { display: none !important; }
+
+  /* Transaction type buttons */
+  .tx-type-group { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-top: 4px; }
+  .tx-type-btn { padding: 14px 8px; border: 2px solid #ddd; border-radius: 10px; background: white; cursor: pointer; text-align: center; transition: all 0.15s; font-family: inherit; }
+  .tx-type-btn .icon { font-size: 22px; display: block; margin-bottom: 4px; }
+  .tx-type-btn .label { font-size: 13px; font-weight: 600; color: #444; }
+  .tx-type-btn:hover { border-color: #4361ee; background: #f5f7ff; }
+  .tx-type-btn.active { border-color: #4361ee; background: #eef1ff; }
+  .tx-type-btn.active .label { color: #4361ee; }
+
+  /* Side checkboxes */
+  .sides-group { display: flex; flex-direction: column; gap: 10px; margin-top: 4px; }
+  .side-card { border: 2px solid #ddd; border-radius: 10px; padding: 14px 16px; cursor: pointer; transition: all 0.15s; display: flex; align-items: flex-start; gap: 12px; }
+  .side-card:hover { border-color: #4361ee; background: #f5f7ff; }
+  .side-card.checked { border-color: #4361ee; background: #eef1ff; }
+  .side-card.checked.green { border-color: #27ae60; background: #f0faf0; }
+  .side-card.checked.purple { border-color: #8b5cf6; background: #f5f3ff; }
+  .side-card input[type=checkbox] { width: 18px; height: 18px; margin-top: 2px; flex-shrink: 0; accent-color: #4361ee; cursor: pointer; }
+  .side-card.green input[type=checkbox] { accent-color: #27ae60; }
+  .side-card.purple input[type=checkbox] { accent-color: #8b5cf6; }
+  .side-card .side-title { font-size: 14px; font-weight: 600; color: #1a1a2e; }
+  .side-card .side-sub { font-size: 12px; color: #666; margin-top: 2px; }
+
+  /* Optional side add-ons for New Listing */
+  .addon-card { border: 2px dashed #ddd; border-radius: 10px; padding: 14px 16px; cursor: pointer; transition: all 0.15s; display: flex; align-items: flex-start; gap: 12px; margin-top: 8px; }
+  .addon-card:hover { border-color: #4361ee; background: #f5f7ff; }
+  .addon-card.checked { border: 2px solid #4361ee; background: #eef1ff; }
+  .addon-card.checked.green { border-color: #27ae60; background: #f0faf0; }
+  .addon-card input[type=checkbox] { width: 18px; height: 18px; margin-top: 2px; flex-shrink: 0; accent-color: #4361ee; cursor: pointer; }
+  .addon-card.green input[type=checkbox] { accent-color: #27ae60; }
+  .addon-card .side-title { font-size: 14px; font-weight: 600; color: #1a1a2e; }
+  .addon-card .side-sub { font-size: 12px; color: #666; margin-top: 2px; }
+
+  /* Section dividers within deal details */
+  .section-label { font-size: 12px; font-weight: 700; color: #888; text-transform: uppercase; letter-spacing: 0.05em; margin: 16px 0 10px; padding-bottom: 4px; border-bottom: 1px solid #eee; }
+
+  .btn { width: 100%; padding: 14px; background: #4361ee; color: white; border: none; border-radius: 10px; font-size: 16px; font-weight: 600; cursor: pointer; transition: background 0.2s; }
+  .btn:hover { background: #3a56d4; }
+  .btn:disabled { background: #aaa; cursor: not-allowed; }
+  .success { display: none; text-align: center; padding: 40px; }
+  .success.show { display: block; }
+  .success h2 { color: #27ae60; font-size: 22px; margin-bottom: 8px; }
+  .success p { color: #666; }
+  .form-content.hide { display: none; }
+  .prefill-banner { background: #e8f5e9; border: 1px solid #81c784; border-radius: 8px; padding: 12px 16px; font-size: 14px; color: #1b5e20; margin-bottom: 16px; }
+  .info-note { background: #fffbe6; border: 1px solid #ffe082; border-radius: 8px; padding: 10px 14px; font-size: 13px; color: #7a5c00; margin-bottom: 14px; }
+
+  /* Address autocomplete */
+  .address-wrap { position: relative; }
+  .addr-suggestions { position: absolute; z-index: 100; top: 100%; left: 0; right: 0; background: white; border: 1px solid #ddd; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.12); max-height: 200px; overflow-y: auto; margin-top: 2px; }
+  .addr-suggestions li { padding: 10px 12px; font-size: 14px; cursor: pointer; border-bottom: 1px solid #f0f0f0; list-style: none; }
+  .addr-suggestions li:last-child { border-bottom: none; }
+  .addr-suggestions li:hover { background: #f0f4ff; color: #4361ee; }
+  @media (max-width: 500px) {
+    body { padding: 12px; }
+    .field-row { grid-template-columns: 1fr !important; }
+    .tx-type-group { grid-template-columns: 1fr !important; }
+    .tx-type-btn { padding: 12px 8px; }
+    .tx-type-btn .icon { font-size: 20px; }
+    .card { padding: 18px; }
+    .btn { font-size: 15px; padding: 12px; }
+    .side-card, .addon-card { padding: 12px 14px; }
+    .header h1 { font-size: 20px; }
+  }
+</style>
+</head>
+<body>
+<div class="container">
+  <div class="header">
+    <h1>🏠 Encore - Deal Intake</h1>
+    <p>Submit your deal information for processing</p>
+  </div>
+
+  <div class="prefill-banner hidden" id="prefillBanner">
+    📋 Pre-filled from your listing at <strong id="prefillAddress"></strong> — select your transaction type below and submit your update!
+  </div>
+
+  <div class="form-content" id="formContent">
+    <!-- Your Info -->
+    <div class="card">
+      <h2>Your Information</h2>
+      <div class="field-row">
+        <div class="field">
+          <label class="required">Your Name</label>
+          <input type="text" id="agentName" placeholder="Full name" required>
+        </div>
+        <div class="field">
+          <label class="required">Your Email</label>
+          <input type="email" id="agentEmail" placeholder="email@example.com" required>
+        </div>
+      </div>
+    </div>
+
+    <!-- Transaction Type -->
+    <div class="card">
+      <h2>Transaction Type</h2>
+      <div class="tx-type-group">
+        <button type="button" class="tx-type-btn" id="btn-purchase" onclick="selectTxType('purchase')">
+          <span class="icon">🤝</span>
+          <span class="label">Purchase</span>
+        </button>
+        <button type="button" class="tx-type-btn" id="btn-refinance" onclick="selectTxType('refinance')">
+          <span class="icon">🔄</span>
+          <span class="label">Refinance</span>
+        </button>
+        <button type="button" class="tx-type-btn" id="btn-new_listing" onclick="selectTxType('new_listing')">
+          <span class="icon">📋</span>
+          <span class="label">New Listing</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Purchase: Side Selection -->
+    <div class="card hidden" id="sidesCard">
+      <h2>Which sides are you handling?</h2>
+      <p style="font-size:13px;color:#666;margin-bottom:14px;">Select all that apply — you can handle 1, 2, or all 3 sides.</p>
+      <div class="sides-group">
+        <label class="side-card" id="sideCard-loan" for="side-loan" onclick="toggleSide('loan', this)">
+          <input type="checkbox" id="side-loan" onchange="updateSides()">
+          <div>
+            <div class="side-title">🏦 Loan (Mortgage)</div>
+            <div class="side-sub">You are originating or brokering the mortgage for this purchase</div>
+          </div>
+        </label>
+        <label class="side-card" id="sideCard-buyer" for="side-buyer" onclick="toggleSide('buyer', this)">
+          <input type="checkbox" id="side-buyer" onchange="updateSides()">
+          <div>
+            <div class="side-title">🏠 Buyer Representation</div>
+            <div class="side-sub">You are representing the buyer as their real estate agent</div>
+          </div>
+        </label>
+        <label class="side-card" id="sideCard-seller" for="side-seller" onclick="toggleSide('seller', this)">
+          <input type="checkbox" id="side-seller" onchange="updateSides()">
+          <div>
+            <div class="side-title">🏡 Seller Representation</div>
+            <div class="side-sub">You are representing the seller as their real estate agent</div>
+          </div>
+        </label>
+      </div>
+    </div>
+
+    <!-- Deal Details (dynamic) -->
+    <div class="card hidden" id="detailsCard">
+      <h2>Deal Details</h2>
+
+      <!-- Property Address (always) -->
+      <div class="field">
+        <label class="required">Property Address</label>
+        <div class="address-wrap" id="addrWrap">
+          <input type="text" id="propertyAddress" placeholder="Start typing an address..." autocomplete="off" oninput="addrInput(this.value)">
+          <ul class="addr-suggestions" id="addrSuggestions" style="display:none"></ul>
+        </div>
+      </div>
+
+      <!-- Loan Side Fields -->
+      <div id="loanFields" class="hidden">
+        <div class="section-label" id="loanSectionLabel">🏦 Loan Details</div>
+        <div class="field">
+          <label class="required">Borrower Name</label>
+          <input type="text" id="borrowerName" placeholder="Borrower full name">
+        </div>
+        <div class="field">
+          <label>Loan Amount</label>
+          <input type="text" id="loanAmount" placeholder="$0.00" oninput="formatCurrency(this)">
+        </div>
+      </div>
+
+      <!-- Buyer Rep Fields -->
+      <div id="buyerFields" class="hidden">
+        <div class="section-label">🏠 Buyer Side</div>
+        <div class="field">
+          <label class="required" id="buyerNameLabel">Buyer Name</label>
+          <input type="text" id="buyerName" placeholder="Buyer full name">
+        </div>
+      </div>
+
+      <!-- Seller Rep Fields -->
+      <div id="sellerFields" class="hidden">
+        <div class="section-label">🏡 Seller Side</div>
+        <div class="field">
+          <label class="required">Seller Name</label>
+          <input type="text" id="sellerName" placeholder="Seller full name">
+        </div>
+      </div>
+
+      <!-- Sales Price (shown if any RE side) -->
+      <div id="salesPriceField" class="field hidden">
+        <label>Sales Price</label>
+        <input type="text" id="salesPrice" placeholder="$0.00" oninput="formatCurrency(this)">
+      </div>
+
+      <!-- New Listing: base fields -->
+      <div id="listingBaseFields" class="hidden">
+        <div class="field">
+          <label class="required">Client Name (Seller)</label>
+          <input type="text" id="listingClientName" placeholder="Seller / client name">
+        </div>
+        <div class="field">
+          <label>Sales Price</label>
+          <input type="text" id="listingSalesPrice" placeholder="$0.00" oninput="formatCurrency(this)">
+        </div>
+        <div class="field">
+          <label>Notes</label>
+          <textarea id="listingNotes" placeholder="Any additional details..."></textarea>
+        </div>
+
+        <!-- Optional add-ons for New Listing -->
+        <div style="margin-top: 8px;">
+          <p style="font-size:13px;font-weight:600;color:#444;margin-bottom:8px;">Also handling on this deal? (optional)</p>
+          <label class="addon-card green" id="addonCard-listingBuyer" onclick="toggleAddon('listingBuyer')">
+            <input type="checkbox" id="addon-listingBuyer" onchange="updateListingAddons()">
+            <div>
+              <div class="side-title">🏠 Buyer Representation</div>
+              <div class="side-sub">You are also representing the buyer on this transaction</div>
+            </div>
+          </label>
+          <label class="addon-card" id="addonCard-listingLoan" onclick="toggleAddon('listingLoan')">
+            <input type="checkbox" id="addon-listingLoan" onchange="updateListingAddons()">
+            <div>
+              <div class="side-title">🏦 Loan (Mortgage)</div>
+              <div class="side-sub">You are also originating or brokering the mortgage for the buyer</div>
+            </div>
+          </label>
+        </div>
+
+        <!-- Buyer name field for listing buyer addon -->
+        <div id="listingBuyerFields" class="hidden" style="margin-top:12px;">
+          <div class="section-label">🏠 Buyer Details</div>
+          <div class="field">
+            <label class="required">Buyer Name</label>
+            <input type="text" id="listingBuyerName" placeholder="Buyer full name">
+          </div>
+        </div>
+
+        <!-- Loan fields for listing loan addon -->
+        <div id="listingLoanFields" class="hidden" style="margin-top:12px;">
+          <div class="section-label">🏦 Loan Details</div>
+          <div class="field">
+            <label class="required" id="listingBorrowerLabel">Borrower Name</label>
+            <input type="text" id="listingBorrowerName" placeholder="Borrower full name">
+          </div>
+          <div class="field">
+            <label>Loan Amount</label>
+            <input type="text" id="listingLoanAmount" placeholder="$0.00" oninput="formatCurrency(this)">
+          </div>
+        </div>
+
+        <!-- Escrow fields for listing (shown when buyer or loan addon checked) -->
+        <div id="listingEscrowFields" class="hidden" style="margin-top:12px;">
+          <div class="section-label">📋 Escrow</div>
+          <div class="field-row">
+            <div class="field">
+              <label>Escrow Company</label>
+              <input type="text" id="listingEscrowCompany" placeholder="Escrow company name">
+            </div>
+            <div class="field">
+              <label>Estimated Close of Escrow</label>
+              <input type="date" id="listingEstCoe">
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Escrow fields (Purchase + Refinance — always in escrow) -->
+      <div id="escrowFields" class="hidden">
+        <div class="section-label">📋 Escrow</div>
+        <div class="field-row">
+          <div class="field">
+            <label>Escrow Company</label>
+            <input type="text" id="escrowCompany" placeholder="Escrow company name">
+          </div>
+          <div class="field">
+            <label>Estimated Close of Escrow</label>
+            <input type="date" id="estimatedCoe">
+          </div>
+        </div>
+      </div>
+
+      <!-- Client Contact (shown for all tx types) -->
+      <div id="clientContactSection" class="hidden">
+        <div class="section-label">📞 Client Contact (Optional)</div>
+        <div class="field-row">
+          <div class="field">
+            <label>Client Phone</label>
+            <input type="tel" id="clientPhone" placeholder="(000) 000-0000">
+          </div>
+          <div class="field">
+            <label>Client Email</label>
+            <input type="email" id="clientEmail" placeholder="client@email.com">
+          </div>
+        </div>
+      </div>
+
+      <!-- Property Type (RE sides + New Listing) -->
+      <div id="propertyTypeSection" class="field hidden">
+        <label>Property Type</label>
+        <select id="propertyType">
+          <option value="">-- Select (optional) --</option>
+          <option value="SFR">Single Family (SFR)</option>
+          <option value="Condo">Condo</option>
+          <option value="Townhome">Townhome</option>
+          <option value="Multi-Family">Multi-Family</option>
+          <option value="2-4 Unit">2-4 Unit</option>
+          <option value="Other">Other</option>
+        </select>
+      </div>
+
+      <!-- Loan Program (Loan side + Refinance) -->
+      <div id="loanProgramSection" class="field hidden">
+        <label>Loan Program</label>
+        <select id="loanProgram">
+          <option value="">-- Select (optional) --</option>
+          <option value="Conventional">Conventional</option>
+          <option value="FHA">FHA</option>
+          <option value="VA">VA</option>
+          <option value="USDA">USDA</option>
+          <option value="Jumbo">Jumbo</option>
+        </select>
+      </div>
+
+      <!-- Notes (for Purchase + Refinance) -->
+      <div class="field" id="notesField">
+        <label>Notes</label>
+        <textarea id="notes" placeholder="Any additional details..."></textarea>
+      </div>
+    </div>
+
+    <button class="btn hidden" id="submitBtn" onclick="submitForm()">Submit Deal</button>
+  </div>
+
+  <div class="success" id="successMsg">
+    <h2>✅ Deal Submitted!</h2>
+    <p id="successText">Your deal information has been received and is now in the pipeline.</p>
+    <br>
+    <button class="btn" onclick="resetForm()" style="max-width:200px;margin:0 auto;display:block;">Submit Another</button>
+  </div>
+</div>
+
+<script>
+const WEBHOOK_URL = 'https://webhooks.tasklet.ai/v1/public/webhook?token=a24ab4497666842f788372230aaf5ff4';
+
+let txType = '';
+
+function selectTxType(type) {
+  txType = type;
+  ['purchase','refinance','new_listing'].forEach(t => {
+    document.getElementById('btn-' + t).classList.toggle('active', t === type);
+  });
+
+  // Reset checkboxes
+  ['loan','buyer','seller'].forEach(s => {
+    document.getElementById('side-' + s).checked = false;
+    document.getElementById('sideCard-' + s).classList.remove('checked','green','purple');
+  });
+  ['listingBuyer','listingLoan'].forEach(a => {
+    document.getElementById('addon-' + a).checked = false;
+    document.getElementById('addonCard-' + a).classList.remove('checked','green');
+  });
+
+  if (type === 'purchase') {
+    document.getElementById('sidesCard').classList.remove('hidden');
+    document.getElementById('detailsCard').classList.add('hidden');
+    document.getElementById('submitBtn').classList.add('hidden');
+    updateSides();
+  } else if (type === 'refinance') {
+    document.getElementById('sidesCard').classList.add('hidden');
+    showDetailsForRefinance();
+  } else if (type === 'new_listing') {
+    document.getElementById('sidesCard').classList.add('hidden');
+    showDetailsForNewListing();
+  }
+}
+
+function toggleSide(side) {
+  setTimeout(() => updateSides(), 0);
+}
+
+function toggleAddon(addon) {
+  setTimeout(() => updateListingAddons(), 0);
+}
+
+function updateSides() {
+  const loan   = document.getElementById('side-loan').checked;
+  const buyer  = document.getElementById('side-buyer').checked;
+  const seller = document.getElementById('side-seller').checked;
+
+  toggleCardStyle('sideCard-loan',   loan,   'checked',        null);
+  toggleCardStyle('sideCard-buyer',  buyer,  'checked green',  null);
+  toggleCardStyle('sideCard-seller', seller, 'checked purple', null);
+
+  const anySelected = loan || buyer || seller;
+  const detailsCard = document.getElementById('detailsCard');
+
+  if (!anySelected) {
+    detailsCard.classList.add('hidden');
+    document.getElementById('submitBtn').classList.add('hidden');
+    return;
+  }
+
+  detailsCard.classList.remove('hidden');
+  document.getElementById('submitBtn').classList.remove('hidden');
+
+  setHidden('loanFields',         !loan);
+  setHidden('buyerFields',        !buyer);
+  setHidden('sellerFields',       !seller);
+  setHidden('salesPriceField',    !(buyer || seller));
+  setHidden('listingBaseFields',  true);
+  setHidden('escrowFields',       false);
+  setHidden('notesField',         false);
+  setHidden('clientContactSection', false);
+  setHidden('propertyTypeSection', !(buyer || seller));
+  setHidden('loanProgramSection',  !loan);
+
+  document.getElementById('loanSectionLabel').style.display = (buyer || seller) ? '' : 'none';
+  document.getElementById('buyerNameLabel').textContent =
+    (loan && buyer) ? 'Buyer Name (same as borrower?)' : 'Buyer Name';
+}
+
+function updateListingAddons() {
+  const buyerChecked = document.getElementById('addon-listingBuyer').checked;
+  const loanChecked  = document.getElementById('addon-listingLoan').checked;
+
+  const buyerCard = document.getElementById('addonCard-listingBuyer');
+  const loanCard  = document.getElementById('addonCard-listingLoan');
+
+  buyerCard.classList.toggle('checked', buyerChecked);
+  buyerCard.classList.toggle('green',   buyerChecked);
+  loanCard.classList.toggle('checked',  loanChecked);
+
+  setHidden('listingBuyerFields', !buyerChecked);
+  setHidden('listingLoanFields',  !loanChecked);
+  setHidden('listingEscrowFields', !(buyerChecked || loanChecked));
+
+  // If both buyer and loan checked, hint borrower = buyer
+  if (buyerChecked && loanChecked) {
+    document.getElementById('listingBorrowerLabel').textContent = 'Borrower Name (same as buyer?)';
+  } else {
+    document.getElementById('listingBorrowerLabel').textContent = 'Borrower Name';
+  }
+}
+
+function toggleCardStyle(id, isActive, activeClasses) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  activeClasses.split(' ').forEach(c => el.classList.toggle(c, isActive));
+}
+
+function showDetailsForRefinance() {
+  document.getElementById('detailsCard').classList.remove('hidden');
+  document.getElementById('submitBtn').classList.remove('hidden');
+  setHidden('loanFields',         false);
+  setHidden('buyerFields',        true);
+  setHidden('sellerFields',       true);
+  setHidden('salesPriceField',    true);
+  setHidden('listingBaseFields',  true);
+  setHidden('escrowFields',       false);
+  setHidden('notesField',         false);
+  setHidden('clientContactSection', false);
+  setHidden('propertyTypeSection',  true);
+  setHidden('loanProgramSection',   false);
+  document.getElementById('loanSectionLabel').style.display = 'none';
+}
+
+function showDetailsForNewListing() {
+  document.getElementById('detailsCard').classList.remove('hidden');
+  document.getElementById('submitBtn').classList.remove('hidden');
+  setHidden('loanFields',         true);
+  setHidden('buyerFields',        true);
+  setHidden('sellerFields',       true);
+  setHidden('salesPriceField',    true);
+  setHidden('listingBaseFields',  false);
+  setHidden('escrowFields',       true);
+  setHidden('notesField',         true); // listing has its own notes field
+  setHidden('clientContactSection', false);
+  setHidden('propertyTypeSection',  false);
+  setHidden('loanProgramSection',   true);
+  // Reset addons
+  setHidden('listingBuyerFields', true);
+  setHidden('listingLoanFields',  true);
+  setHidden('listingEscrowFields',true);
+  // Pre-fill listing fields from URL params if available
+  if (window._prefillClientName && !document.getElementById('listingClientName').value) {
+    document.getElementById('listingClientName').value = window._prefillClientName;
+  }
+  if (window._prefillSalesPrice && !document.getElementById('listingSalesPrice').value) {
+    const sp = parseFloat(window._prefillSalesPrice);
+    if (sp) document.getElementById('listingSalesPrice').value = '$' + sp.toLocaleString('en-US');
+  }
+}
+
+function setHidden(id, hide) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  if (hide) el.classList.add('hidden'); else el.classList.remove('hidden');
+}
+
+function formatCurrency(input) {
+  let val = input.value.replace(/[^0-9.]/g, '');
+  if (val) input.value = '$' + Number(val).toLocaleString('en-US');
+}
+
+function parseCurrency(val) {
+  if (!val) return null;
+  return parseFloat(val.replace(/[^0-9.]/g, '')) || null;
+}
+
+async function sendToWebhook(data) {
+  const resp = await fetch(WEBHOOK_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data)
+  });
+  if (!resp.ok) throw new Error('Server error');
+}
+
+async function submitForm() {
+  const btn        = document.getElementById('submitBtn');
+  const agentName  = document.getElementById('agentName').value.trim();
+  const agentEmail = document.getElementById('agentEmail').value.trim();
+  const propAddr   = document.getElementById('propertyAddress').value.trim();
+
+  if (!agentName || !agentEmail) { alert('Please enter your name and email.'); return; }
+  if (!txType)                   { alert('Please select a transaction type.'); return; }
+  if (!propAddr && txType !== 'new_listing') { alert('Please enter the property address.'); return; }
+
+  // CRM optional fields (shared across all paths)
+  const clientPhone  = document.getElementById('clientPhone').value.trim();
+  const clientEmail  = document.getElementById('clientEmail').value.trim();
+  const propertyType = document.getElementById('propertyType').value;
+  const loanProgram  = document.getElementById('loanProgram').value;
+  const crmBase = {
+    ...(clientPhone  ? { client_phone:   clientPhone  } : {}),
+    ...(clientEmail  ? { client_email:   clientEmail  } : {}),
+    ...(propertyType ? { property_type:  propertyType } : {}),
+  };
+
+  // --- PURCHASE ---
+  if (txType === 'purchase') {
+    const loan   = document.getElementById('side-loan').checked;
+    const buyer  = document.getElementById('side-buyer').checked;
+    const seller = document.getElementById('side-seller').checked;
+    if (!loan && !buyer && !seller) { alert('Please select at least one side.'); return; }
+
+    const notes        = document.getElementById('notes').value.trim();
+    const escrowCo     = document.getElementById('escrowCompany').value.trim();
+    const estCoe       = document.getElementById('estimatedCoe').value;
+    const salesPrice   = parseCurrency(document.getElementById('salesPrice').value);
+    const loanAmt      = parseCurrency(document.getElementById('loanAmount').value);
+    const borrowerName = document.getElementById('borrowerName').value.trim();
+    const buyerName    = document.getElementById('buyerName').value.trim();
+    const sellerName   = document.getElementById('sellerName').value.trim();
+
+    if (loan   && !borrowerName) { alert('Please enter the borrower name.'); return; }
+    if (buyer  && !buyerName)    { alert('Please enter the buyer name.'); return; }
+    if (seller && !sellerName)   { alert('Please enter the seller name.'); return; }
+
+    const sideCount = [loan, buyer, seller].filter(Boolean).length;
+    const groupId = sideCount > 1 ? (crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36) + Math.random().toString(36).slice(2)) : null;
+    const base = { agent_name: agentName, agent_email: agentEmail, property_address: propAddr,
+                   escrow_company: escrowCo, estimated_coe: estCoe, sales_price: salesPrice, notes,
+                   ...crmBase,
+                   ...(groupId ? { group_id: groupId } : {}) };
+
+    btn.disabled = true; btn.textContent = 'Submitting...';
+    try {
+      if (loan) {
+        await sendToWebhook({ ...base, deal_type: 'mortgage', deal_stage: 'in_escrow',
+          transaction_type: 'purchase', client_name: borrowerName, loan_amount: loanAmt,
+          representation: '', ...(loanProgram ? { loan_program: loanProgram } : {}) });
+      }
+      if (buyer) {
+        await sendToWebhook({ ...base, deal_type: 're', deal_stage: 'in_escrow',
+          transaction_type: 'purchase', client_name: buyerName, representation: 'buyer', loan_amount: null });
+      }
+      if (seller) {
+        await sendToWebhook({ ...base, deal_type: 're', deal_stage: 'in_escrow',
+          transaction_type: 'purchase', client_name: sellerName, representation: 'seller', loan_amount: null });
+      }
+      const sideCount = [loan, buyer, seller].filter(Boolean).length;
+      showSuccess(sideCount > 1
+        ? `${sideCount} deals have been added to the pipeline! Bryant will be notified.`
+        : 'Your deal has been received and is now in the pipeline.');
+    } catch(e) { handleError(btn); }
+
+  // --- REFINANCE ---
+  } else if (txType === 'refinance') {
+    const borrowerName = document.getElementById('borrowerName').value.trim();
+    const notes        = document.getElementById('notes').value.trim();
+    const escrowCo     = document.getElementById('escrowCompany').value.trim();
+    const estCoe       = document.getElementById('estimatedCoe').value;
+    const loanAmt      = parseCurrency(document.getElementById('loanAmount').value);
+    if (!borrowerName) { alert('Please enter the borrower name.'); return; }
+    btn.disabled = true; btn.textContent = 'Submitting...';
+    try {
+      await sendToWebhook({ agent_name: agentName, agent_email: agentEmail,
+        property_address: propAddr, client_name: borrowerName, deal_type: 'mortgage',
+        deal_stage: 'in_escrow', transaction_type: 'refinance', loan_amount: loanAmt,
+        escrow_company: escrowCo, estimated_coe: estCoe, notes,
+        ...crmBase, ...(loanProgram ? { loan_program: loanProgram } : {}) });
+      showSuccess('Your refinance deal has been received and is now in the pipeline.');
+    } catch(e) { handleError(btn); }
+
+  // --- NEW LISTING ---
+  } else if (txType === 'new_listing') {
+    const listingAddr   = document.getElementById('propertyAddress').value.trim();
+    const clientName    = document.getElementById('listingClientName').value.trim();
+    const notes         = document.getElementById('listingNotes').value.trim();
+    const salesPrice    = parseCurrency(document.getElementById('listingSalesPrice').value);
+    const buyerAddon    = document.getElementById('addon-listingBuyer').checked;
+    const loanAddon     = document.getElementById('addon-listingLoan').checked;
+    const buyerName     = document.getElementById('listingBuyerName').value.trim();
+    const borrowerName  = document.getElementById('listingBorrowerName').value.trim();
+    const loanAmt       = parseCurrency(document.getElementById('listingLoanAmount').value);
+    const escrowCo      = document.getElementById('listingEscrowCompany').value.trim();
+    const estCoe        = document.getElementById('listingEstCoe').value;
+
+    if (!listingAddr)               { alert('Please enter the property address.'); return; }
+    if (!clientName)                { alert('Please enter the client (seller) name.'); return; }
+    if (buyerAddon && !buyerName)   { alert('Please enter the buyer name.'); return; }
+    if (loanAddon  && !borrowerName){ alert('Please enter the borrower name.'); return; }
+
+    const extras = [buyerAddon, loanAddon].filter(Boolean).length;
+    const listingGroupId = extras > 0 ? (crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36) + Math.random().toString(36).slice(2)) : null;
+
+    btn.disabled = true; btn.textContent = 'Submitting...';
+    try {
+      // Always fire seller/listing deal
+      await sendToWebhook({ agent_name: agentName, agent_email: agentEmail,
+        property_address: listingAddr, client_name: clientName, deal_type: 're',
+        deal_stage: 'new_listing', transaction_type: null, sales_price: salesPrice,
+        representation: 'seller', escrow_company: '', estimated_coe: '', notes,
+        ...crmBase, ...(listingGroupId ? { group_id: listingGroupId } : {}) });
+
+      // Optional buyer rep addon
+      if (buyerAddon) {
+        await sendToWebhook({ agent_name: agentName, agent_email: agentEmail,
+          property_address: listingAddr, client_name: buyerName, deal_type: 're',
+          deal_stage: 'in_escrow', transaction_type: 'purchase', sales_price: salesPrice,
+          representation: 'buyer', escrow_company: escrowCo, estimated_coe: estCoe, notes,
+          ...crmBase, ...(listingGroupId ? { group_id: listingGroupId } : {}) });
+      }
+
+      // Optional loan addon
+      if (loanAddon) {
+        await sendToWebhook({ agent_name: agentName, agent_email: agentEmail,
+          property_address: listingAddr, client_name: borrowerName, deal_type: 'mortgage',
+          deal_stage: 'in_escrow', transaction_type: 'purchase', loan_amount: loanAmt,
+          escrow_company: escrowCo, estimated_coe: estCoe, representation: '', notes,
+          ...crmBase, ...(loanProgram ? { loan_program: loanProgram } : {}),
+          ...(listingGroupId ? { group_id: listingGroupId } : {}) });
+      }
+
+      const extras = [buyerAddon, loanAddon].filter(Boolean).length;
+      showSuccess(extras > 0
+        ? `Listing submitted + ${extras} additional deal${extras > 1 ? 's' : ''} added to the pipeline!`
+        : 'Your listing has been submitted! Bryant will be notified right away.');
+    } catch(e) { handleError(btn); }
+  }
+}
+
+function showSuccess(msg) {
+  document.getElementById('successText').textContent = msg;
+  document.getElementById('formContent').classList.add('hide');
+  document.getElementById('successMsg').classList.add('show');
+}
+
+function handleError(btn) {
+  alert('Something went wrong. Please try again or contact your administrator.');
+  btn.disabled = false;
+  btn.textContent = 'Submit Deal';
+}
+
+function resetForm() {
+  document.getElementById('formContent').classList.remove('hide');
+  document.getElementById('successMsg').classList.remove('show');
+  document.querySelectorAll('input:not([type=checkbox])').forEach(el => el.value = '');
+  document.querySelectorAll('textarea').forEach(el => el.value = '');
+  document.querySelectorAll('input[type=checkbox]').forEach(el => el.checked = false);
+  ['purchase','refinance','new_listing'].forEach(t => document.getElementById('btn-' + t).classList.remove('active'));
+  ['loan','buyer','seller'].forEach(s => {
+    const c = document.getElementById('sideCard-' + s);
+    if (c) c.classList.remove('checked','green','purple');
+  });
+  ['listingBuyer','listingLoan'].forEach(a => {
+    const c = document.getElementById('addonCard-' + a);
+    if (c) c.classList.remove('checked','green');
+  });
+  txType = '';
+  document.getElementById('sidesCard').classList.add('hidden');
+  document.getElementById('detailsCard').classList.add('hidden');
+  document.getElementById('submitBtn').classList.add('hidden');
+  document.getElementById('submitBtn').disabled = false;
+  document.getElementById('submitBtn').textContent = 'Submit Deal';
+  setHidden('clientContactSection', true);
+  setHidden('propertyTypeSection', true);
+  setHidden('loanProgramSection', true);
+}
+// Pre-fill from URL params (used in listing reminder emails)
+(function prefillFromParams() {
+  const params = new URLSearchParams(window.location.search);
+  const agentName  = params.get('agent_name')       || '';
+  const agentEmail = params.get('agent_email')      || '';
+  const propAddr   = params.get('property_address') || '';
+  const clientName = params.get('client_name')      || '';
+  const salesPrice = params.get('sales_price')      || '';
+
+  if (!agentName && !agentEmail && !propAddr) return;
+
+  if (agentName) {
+    const el = document.getElementById('agentName');
+    el.value = agentName; el.readOnly = true; el.style.background = '#f5f5f5';
+  }
+  if (agentEmail) {
+    const el = document.getElementById('agentEmail');
+    el.value = agentEmail; el.readOnly = true; el.style.background = '#f5f5f5';
+  }
+  if (propAddr) {
+    document.getElementById('propertyAddress').value = propAddr;
+    window._prefillAddress = propAddr;
+  }
+  window._prefillClientName = clientName;
+  window._prefillSalesPrice = salesPrice;
+
+  // Show banner
+  const banner = document.getElementById('prefillBanner');
+  if (banner) {
+    banner.classList.remove('hidden');
+    const addrEl = document.getElementById('prefillAddress');
+    if (addrEl) addrEl.textContent = propAddr || 'your listing';
+  }
+})();
+
+</script>
+
+<script>
+  // Address autocomplete via Nominatim
+  let addrTimer = null;
+  const stateMap = {Alabama:'AL',Alaska:'AK',Arizona:'AZ',Arkansas:'AR',California:'CA',Colorado:'CO',Connecticut:'CT',Delaware:'DE',Florida:'FL',Georgia:'GA',Hawaii:'HI',Idaho:'ID',Illinois:'IL',Indiana:'IN',Iowa:'IA',Kansas:'KS',Kentucky:'KY',Louisiana:'LA',Maine:'ME',Maryland:'MD',Massachusetts:'MA',Michigan:'MI',Minnesota:'MN',Mississippi:'MS',Missouri:'MO',Montana:'MT',Nebraska:'NE',Nevada:'NV','New Hampshire':'NH','New Jersey':'NJ','New Mexico':'NM','New York':'NY','North Carolina':'NC','North Dakota':'ND',Ohio:'OH',Oklahoma:'OK',Oregon:'OR',Pennsylvania:'PA','Rhode Island':'RI','South Carolina':'SC','South Dakota':'SD',Tennessee:'TN',Texas:'TX',Utah:'UT',Vermont:'VT',Virginia:'VA',Washington:'WA','West Virginia':'WV',Wisconsin:'WI',Wyoming:'WY'};
+
+  function formatAddr(r) {
+    const a = r.address || {};
+    const num = a.house_number || '';
+    const street = a.road || '';
+    const city = a.city || a.town || a.village || a.hamlet || '';
+    const stateAbbr = stateMap[a.state] || a.state || '';
+    const zip = a.postcode || '';
+    const parts = [(num + ' ' + street).trim(), city, (stateAbbr + ' ' + zip).trim()].filter(Boolean);
+    return parts.join(', ');
+  }
+
+  function addrInput(val) {
+    clearTimeout(addrTimer);
+    const list = document.getElementById('addrSuggestions');
+    if (val.length < 4) { list.style.display = 'none'; return; }
+    addrTimer = setTimeout(async () => {
+      try {
+        const res = await fetch('https://nominatim.openstreetmap.org/search?format=json&addressdetails=1&countrycodes=us&limit=5&q=' + encodeURIComponent(val), {headers: {'User-Agent': 'EncoreIntakeForm/1.0'}});
+        const data = await res.json();
+        const addrs = data.map(formatAddr).filter(Boolean);
+        list.innerHTML = '';
+        if (addrs.length === 0) { list.style.display = 'none'; return; }
+        addrs.forEach(addr => {
+          const li = document.createElement('li');
+          li.textContent = addr;
+          li.onclick = () => {
+            document.getElementById('propertyAddress').value = addr;
+            list.style.display = 'none';
+          };
+          list.appendChild(li);
+        });
+        list.style.display = 'block';
+      } catch { list.style.display = 'none'; }
+    }, 500);
+  }
+
+  // Close suggestions on outside click
+  document.addEventListener('click', e => {
+    const wrap = document.getElementById('addrWrap');
+    if (wrap && !wrap.contains(e.target)) {
+      const list = document.getElementById('addrSuggestions');
+      if (list) list.style.display = 'none';
+    }
+  });
+</script>
+
+</body>
+</html>

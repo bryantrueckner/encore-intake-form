@@ -121,6 +121,18 @@
     .toast.ok { border-color: var(--green); color: var(--green); }
     .toast.err { border-color: var(--red); color: var(--red); }
 
+    /* MOBILE */
+    @media (max-width: 420px) {
+      .detail-grid { grid-template-columns: 1fr !important; }
+      .form-row { grid-template-columns: 1fr !important; }
+      .stat-grid { grid-template-columns: 1fr !important; }
+      .stat-value { font-size: 22px; }
+      .modal { padding: 16px 14px 32px; }
+      .modal-title { font-size: 17px; }
+      .action-row .btn { min-width: 90px; font-size: 13px; padding: 8px 6px; }
+      .toast { white-space: normal; text-align: center; width: 88vw; }
+    }
+
     /* EMPTY */
     .empty { text-align: center; padding: 52px 24px; color: var(--text2); }
     .empty-icon { font-size: 44px; margin-bottom: 12px; }
@@ -640,6 +652,8 @@ function openDetail(id) {
       if(d.loan_program) rows.push(`<div class=\"detail-item\"><div class=\"label\">🏦 Loan Program</div><div class=\"value\">${d.loan_program}</div></div>`);
       return rows.length ? `<div class="detail-grid" style="margin-bottom:14px">${rows.join('')}</div>` : '';
     })()}
+    ${d.stage==='closed'?`<div id="deal-pdf-${d.id}" style="margin-bottom:14px"><div style="font-size:13px;color:#64748b">📄 Checking for breakdown PDF…</div></div>`:''}
+    ${d.group_id?`<div id="deal-linked-${d.id}" style="margin-bottom:14px"></div>`:''}
     <div class="action-row">
       <button class="btn btn-sm" style="background:rgba(99,102,241,0.2);color:#818cf8;border:1px solid rgba(99,102,241,0.3)" onclick="openEdit(${d.id})">✏️ Edit</button>
       ${!pending.length?`
@@ -648,6 +662,74 @@ function openDetail(id) {
       `:''}
     </div>
   `);
+  if (d.stage==='closed') loadBreakdownPDF(d);
+  if (d.group_id) loadLinkedDeals(d);
+  loadActivityLog(d);
+}
+
+async function loadActivityLog(d) {
+  // Only show if table exists — silently skip if not
+  try {
+    const { data, error } = await sb.from('deal_activity_log').select('*').eq('deal_id', String(d.tasklet_id||d.id)).order('created_at', {ascending: false}).limit(10);
+    if (error || !data?.length) return;
+    const rows = data.map(entry => {
+      const dt = new Date(entry.created_at).toLocaleDateString('en-US',{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'});
+      const icon = {status_change:'🔄',breakdown_sent:'📄',deal_created:'✅',note_added:'📝'}[entry.action]||'📋';
+      const desc = entry.action==='status_change'
+        ? `Status changed: ${entry.old_value} → ${entry.new_value}`
+        : entry.note || entry.action;
+      return `<div style="display:flex;gap:10px;align-items:flex-start;padding:6px 0;border-bottom:1px solid rgba(255,255,255,0.05)">
+        <span style="font-size:14px">${icon}</span>
+        <div style="flex:1"><div style="font-size:12px">${desc}</div><div style="font-size:11px;color:#475569;margin-top:2px">${dt}</div></div>
+      </div>`;
+    }).join('');
+    // Append to the deal-linked div or create a new one
+    const modal = document.getElementById('modal');
+    if (!modal) return;
+    const existing = document.getElementById(`deal-activity-${d.id}`);
+    const actHtml = `<div id="deal-activity-${d.id}" style="margin-bottom:14px">
+      <div style="font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:#64748b;margin-bottom:8px">📋 Activity</div>
+      ${rows}
+    </div>`;
+    if (!existing) {
+      // Insert before action-row
+      const actionRow = modal.querySelector('.action-row');
+      if (actionRow) actionRow.insertAdjacentHTML('beforebegin', actHtml);
+    }
+  } catch(e) { /* table may not exist yet */ }
+}
+
+async function loadBreakdownPDF(d) {
+  const el = document.getElementById(`deal-pdf-${d.id}`);
+  if (!el) return;
+  const table = d.deal_type==='mortgage' ? 'mortgage_breakdowns' : 're_breakdown_history';
+  const { data } = await sb.from(table).select('pdf_path').eq('deal_id', d.tasklet_id).maybeSingle();
+  if (data?.pdf_path) {
+    el.innerHTML = `<button onclick="window.open('${data.pdf_path}','_blank')" class="btn btn-sm" style="background:rgba(16,185,129,0.15);color:#10b981;border:1px solid rgba(16,185,129,0.3);width:100%">📄 View Commission Breakdown PDF</button>`;
+  } else {
+    el.innerHTML = `<div style="font-size:12px;color:#475569;margin-bottom:6px">📄 No breakdown PDF on file yet</div>`;
+  }
+}
+
+async function loadLinkedDeals(d) {
+  const el = document.getElementById(`deal-linked-${d.id}`);
+  if (!el) return;
+  const { data } = await sb.from('portal_deals').select('id,deal_type,client_name,stage,loan_amount,sales_price').eq('group_id', d.group_id).neq('id', d.id);
+  if (data?.length) {
+    const rows = data.map(sd => {
+      const sl = {active_listing:'🟢 Active',in_escrow:'🟡 In Escrow',closed:'✅ Closed'}[sd.stage]||sd.stage;
+      const icon = sd.deal_type==='mortgage'?'🏦':'🏠';
+      const type = sd.deal_type==='mortgage'?'Loan':'RE';
+      return `<div onclick="openDetail(${sd.id})" style="cursor:pointer;padding:8px 12px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);border-radius:8px;margin-bottom:6px;display:flex;justify-content:space-between;align-items:center">
+        <span style="font-size:13px">${icon} ${type} · ${sd.client_name||'—'}</span>
+        <span style="font-size:12px;color:#94a3b8">${sl}</span>
+      </div>`;
+    }).join('');
+    el.innerHTML = `<div style="margin-bottom:14px">
+      <div style="font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:#64748b;margin-bottom:8px">🔗 Linked Deal${data.length>1?'s':''}</div>
+      ${rows}
+    </div>`;
+  }
 }
 
 // ── EDIT DEAL ─────────────────────────────────────
@@ -849,6 +931,18 @@ async function saveEdit(id) {
     last_synced_at:new Date().toISOString()
   }).eq('id',id);
   if (error) { toast('Error: '+error.message,'err'); return; }
+  // Log status change to activity log
+  if (stage !== d.stage) {
+    const stageLabels = {active_listing:'Active Listing',in_escrow:'In Escrow',closed:'Closed'};
+    sb.from('deal_activity_log').insert({
+      deal_id: String(d.tasklet_id||id),
+      action: 'status_change',
+      old_value: stageLabels[d.stage] || d.stage,
+      new_value: stageLabels[stage] || stage,
+      changed_by: 'agent',
+      note: `${user.user_metadata?.full_name||user.email} updated status`
+    }).then(()=>{}).catch(()=>{});
+  }
   fetch(WEBHOOK,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({
     form_type:'portal_edit', tasklet_deal_id:d.tasklet_id, portal_deal_id:id,
     agent_name:d.agent_name, agent_email:d.agent_email,
