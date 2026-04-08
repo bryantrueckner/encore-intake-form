@@ -1144,12 +1144,17 @@ async function submitAdd() {
     re_listing:{deal_type:'re',transaction_type:'new_listing',representation:'Seller'}
   };
   const m = map[t];
-  await fetch(WEBHOOK,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({
-    form_type:'portal_add_deal', agent_name:user.user_metadata?.full_name||user.email, agent_email:user.email,
-    property_address:addr, client_name:client, coe_date:coe, escrow_company:escrow,
-    loan_amount:m.deal_type==='mortgage'?amt:'', sales_price:m.deal_type==='re'?amt:'', ...m
-  })});
-  closeModal(); toast('🎉 Deal submitted! It will appear once your broker confirms.','ok');
+  try {
+    const res = await fetch(WEBHOOK,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({
+      form_type:'portal_add_deal', agent_name:user.user_metadata?.full_name||user.email, agent_email:user.email,
+      property_address:addr, client_name:client, coe_date:coe, escrow_company:escrow,
+      loan_amount:m.deal_type==='mortgage'?amt:'', sales_price:m.deal_type==='re'?amt:'', ...m
+    })});
+    if (!res.ok) throw new Error('Server error ' + res.status);
+    closeModal(); toast('🎉 Deal submitted! It will appear once your broker confirms.','ok');
+  } catch(e) {
+    toast('⚠️ Submission failed — check your connection and try again.','err');
+  }
 }
 
 // ── CHANGE REQUESTS ───────────────────────────────

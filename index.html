@@ -650,7 +650,7 @@ async function submitForm() {
       // Always fire seller/listing deal
       await sendToWebhook({ agent_name: agentName, agent_email: agentEmail,
         property_address: listingAddr, client_name: clientName, deal_type: 're',
-        deal_stage: 'new_listing', transaction_type: null, sales_price: salesPrice,
+        deal_stage: 'new_listing', transaction_type: 'new_listing', sales_price: salesPrice,
         representation: 'seller', escrow_company: '', estimated_coe: '', notes,
         ...crmBase, ...(listingGroupId ? { group_id: listingGroupId } : {}) });
 
