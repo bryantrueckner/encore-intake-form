@@ -299,6 +299,48 @@
         </div>
       </div>
 
+      <!-- Client Contact (shown for all tx types) -->
+      <div id="clientContactSection" class="hidden">
+        <div class="section-label">📞 Client Contact (Optional)</div>
+        <div class="field-row">
+          <div class="field">
+            <label>Client Phone</label>
+            <input type="tel" id="clientPhone" placeholder="(000) 000-0000">
+          </div>
+          <div class="field">
+            <label>Client Email</label>
+            <input type="email" id="clientEmail" placeholder="client@email.com">
+          </div>
+        </div>
+      </div>
+
+      <!-- Property Type (RE sides + New Listing) -->
+      <div id="propertyTypeSection" class="field hidden">
+        <label>Property Type</label>
+        <select id="propertyType">
+          <option value="">-- Select (optional) --</option>
+          <option value="SFR">Single Family (SFR)</option>
+          <option value="Condo">Condo</option>
+          <option value="Townhome">Townhome</option>
+          <option value="Multi-Family">Multi-Family</option>
+          <option value="2-4 Unit">2-4 Unit</option>
+          <option value="Other">Other</option>
+        </select>
+      </div>
+
+      <!-- Loan Program (Loan side + Refinance) -->
+      <div id="loanProgramSection" class="field hidden">
+        <label>Loan Program</label>
+        <select id="loanProgram">
+          <option value="">-- Select (optional) --</option>
+          <option value="Conventional">Conventional</option>
+          <option value="FHA">FHA</option>
+          <option value="VA">VA</option>
+          <option value="USDA">USDA</option>
+          <option value="Jumbo">Jumbo</option>
+        </select>
+      </div>
+
       <!-- Notes (for Purchase + Refinance) -->
       <div class="field" id="notesField">
         <label>Notes</label>
@@ -388,6 +430,9 @@ function updateSides() {
   setHidden('listingBaseFields',  true);
   setHidden('escrowFields',       false);
   setHidden('notesField',         false);
+  setHidden('clientContactSection', false);
+  setHidden('propertyTypeSection', !(buyer || seller));
+  setHidden('loanProgramSection',  !loan);
 
   document.getElementById('loanSectionLabel').style.display = (buyer || seller) ? '' : 'none';
   document.getElementById('buyerNameLabel').textContent =
@@ -433,6 +478,9 @@ function showDetailsForRefinance() {
   setHidden('listingBaseFields',  true);
   setHidden('escrowFields',       false);
   setHidden('notesField',         false);
+  setHidden('clientContactSection', false);
+  setHidden('propertyTypeSection',  true);
+  setHidden('loanProgramSection',   false);
   document.getElementById('loanSectionLabel').style.display = 'none';
 }
 
@@ -446,6 +494,9 @@ function showDetailsForNewListing() {
   setHidden('listingBaseFields',  false);
   setHidden('escrowFields',       true);
   setHidden('notesField',         true); // listing has its own notes field
+  setHidden('clientContactSection', false);
+  setHidden('propertyTypeSection',  false);
+  setHidden('loanProgramSection',   true);
   // Reset addons
   setHidden('listingBuyerFields', true);
   setHidden('listingLoanFields',  true);
@@ -495,6 +546,17 @@ async function submitForm() {
   if (!txType)                   { alert('Please select a transaction type.'); return; }
   if (!propAddr && txType !== 'new_listing') { alert('Please enter the property address.'); return; }
 
+  // CRM optional fields (shared across all paths)
+  const clientPhone  = document.getElementById('clientPhone').value.trim();
+  const clientEmail  = document.getElementById('clientEmail').value.trim();
+  const propertyType = document.getElementById('propertyType').value;
+  const loanProgram  = document.getElementById('loanProgram').value;
+  const crmBase = {
+    ...(clientPhone  ? { client_phone:   clientPhone  } : {}),
+    ...(clientEmail  ? { client_email:   clientEmail  } : {}),
+    ...(propertyType ? { property_type:  propertyType } : {}),
+  };
+
   // --- PURCHASE ---
   if (txType === 'purchase') {
     const loan   = document.getElementById('side-loan').checked;
@@ -519,13 +581,15 @@ async function submitForm() {
     const groupId = sideCount > 1 ? (crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36) + Math.random().toString(36).slice(2)) : null;
     const base = { agent_name: agentName, agent_email: agentEmail, property_address: propAddr,
                    escrow_company: escrowCo, estimated_coe: estCoe, sales_price: salesPrice, notes,
+                   ...crmBase,
                    ...(groupId ? { group_id: groupId } : {}) };
 
     btn.disabled = true; btn.textContent = 'Submitting...';
     try {
       if (loan) {
         await sendToWebhook({ ...base, deal_type: 'mortgage', deal_stage: 'in_escrow',
-          transaction_type: 'purchase', client_name: borrowerName, loan_amount: loanAmt, representation: '' });
+          transaction_type: 'purchase', client_name: borrowerName, loan_amount: loanAmt,
+          representation: '', ...(loanProgram ? { loan_program: loanProgram } : {}) });
       }
       if (buyer) {
         await sendToWebhook({ ...base, deal_type: 're', deal_stage: 'in_escrow',
@@ -554,7 +618,8 @@ async function submitForm() {
       await sendToWebhook({ agent_name: agentName, agent_email: agentEmail,
         property_address: propAddr, client_name: borrowerName, deal_type: 'mortgage',
         deal_stage: 'in_escrow', transaction_type: 'refinance', loan_amount: loanAmt,
-        escrow_company: escrowCo, estimated_coe: estCoe, notes });
+        escrow_company: escrowCo, estimated_coe: estCoe, notes,
+        ...crmBase, ...(loanProgram ? { loan_program: loanProgram } : {}) });
       showSuccess('Your refinance deal has been received and is now in the pipeline.');
     } catch(e) { handleError(btn); }
 
@@ -587,7 +652,7 @@ async function submitForm() {
         property_address: listingAddr, client_name: clientName, deal_type: 're',
         deal_stage: 'new_listing', transaction_type: null, sales_price: salesPrice,
         representation: 'seller', escrow_company: '', estimated_coe: '', notes,
-        ...(listingGroupId ? { group_id: listingGroupId } : {}) });
+        ...crmBase, ...(listingGroupId ? { group_id: listingGroupId } : {}) });
 
       // Optional buyer rep addon
       if (buyerAddon) {
@@ -595,7 +660,7 @@ async function submitForm() {
           property_address: listingAddr, client_name: buyerName, deal_type: 're',
           deal_stage: 'in_escrow', transaction_type: 'purchase', sales_price: salesPrice,
           representation: 'buyer', escrow_company: escrowCo, estimated_coe: estCoe, notes,
-          ...(listingGroupId ? { group_id: listingGroupId } : {}) });
+          ...crmBase, ...(listingGroupId ? { group_id: listingGroupId } : {}) });
       }
 
       // Optional loan addon
@@ -604,6 +669,7 @@ async function submitForm() {
           property_address: listingAddr, client_name: borrowerName, deal_type: 'mortgage',
           deal_stage: 'in_escrow', transaction_type: 'purchase', loan_amount: loanAmt,
           escrow_company: escrowCo, estimated_coe: estCoe, representation: '', notes,
+          ...crmBase, ...(loanProgram ? { loan_program: loanProgram } : {}),
           ...(listingGroupId ? { group_id: listingGroupId } : {}) });
       }
 
@@ -648,6 +714,9 @@ function resetForm() {
   document.getElementById('submitBtn').classList.add('hidden');
   document.getElementById('submitBtn').disabled = false;
   document.getElementById('submitBtn').textContent = 'Submit Deal';
+  setHidden('clientContactSection', true);
+  setHidden('propertyTypeSection', true);
+  setHidden('loanProgramSection', true);
 }
 // Pre-fill from URL params (used in listing reminder emails)
 (function prefillFromParams() {

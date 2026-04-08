@@ -632,7 +632,14 @@ function openDetail(id) {
         return proj2?`<div class="detail-item"><div class="label">💰 Projected Commission</div><div class="value" style="color:#818cf8;font-size:20px;font-weight:800">~$${proj2.toLocaleString()}</div><div style="font-size:12px;color:#64748b;margin-top:2px">${pc}% of $${pr.toLocaleString()}</div></div>`:'';
       })()}
     </div>
-    ${d.notes?`<div style="margin-bottom:14px"><div class="form-label">Notes</div><div style="font-size:14px;color:#94a3b8;white-space:pre-wrap">${d.notes}</div></div>`:''}
+    ${d.notes?`<div style="margin-bottom:14px"><div class="form-label">Notes</div><div style="font-size:14px;color:#94a3b8;white-space:pre-wrap">${d.notes}</div></div>`:''}\n    ${(()=>{
+      const rows = [];
+      if(d.client_phone) rows.push(`<div class=\"detail-item\"><div class=\"label\">📞 Phone</div><div class=\"value\"><a href="tel:${d.client_phone}" style="color:#818cf8">${d.client_phone}</a></div></div>`);
+      if(d.client_email) rows.push(`<div class=\"detail-item\"><div class=\"label\">✉️ Client Email</div><div class=\"value\"><a href="mailto:${d.client_email}" style="color:#818cf8">${d.client_email}</a></div></div>`);
+      if(d.property_type) rows.push(`<div class=\"detail-item\"><div class=\"label\">🏠 Property Type</div><div class=\"value\">${d.property_type}</div></div>`);
+      if(d.loan_program) rows.push(`<div class=\"detail-item\"><div class=\"label\">🏦 Loan Program</div><div class=\"value\">${d.loan_program}</div></div>`);
+      return rows.length ? `<div class="detail-grid" style="margin-bottom:14px">${rows.join('')}</div>` : '';
+    })()}
     <div class="action-row">
       <button class="btn btn-sm" style="background:rgba(99,102,241,0.2);color:#818cf8;border:1px solid rgba(99,102,241,0.3)" onclick="openEdit(${d.id})">✏️ Edit</button>
       ${!pending.length?`
@@ -733,6 +740,30 @@ function openEdit(id) {
     </div>`:''}
     ${compRow}
     <div class="form-group"><label class="form-label">Notes</label><textarea class="form-input" id="eNotes" rows="3" style="resize:vertical">${d.notes||''}</textarea></div>
+    <div style="border-top:1px solid rgba(255,255,255,0.08);margin:12px 0 8px;padding-top:12px;">
+      <div style="font-size:11px;font-weight:700;color:#888;text-transform:uppercase;letter-spacing:.05em;margin-bottom:10px;">📞 Client Contact (Optional)</div>
+      <div class="form-row">
+        <div class="form-group"><label class="form-label">Client Phone</label><input class="form-input" id="eClientPhone" value="${d.client_phone||''}" placeholder="(000) 000-0000" type="tel"></div>
+        <div class="form-group"><label class="form-label">Client Email</label><input class="form-input" id="eClientEmail" value="${d.client_email||''}" placeholder="client@email.com" type="email"></div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Property Type</label>
+          <select class="form-input" id="ePropertyType">
+            <option value="">-- Select --</option>
+            ${['SFR','Condo','Townhome','Multi-Family','2-4 Unit','Other'].map(t=>`<option value="${t}" ${d.property_type===t?'selected':''}>${t==='SFR'?'Single Family (SFR)':t}</option>`).join('')}
+          </select>
+        </div>
+        ${d.deal_type==='mortgage'?`
+        <div class="form-group">
+          <label class="form-label">Loan Program</label>
+          <select class="form-input" id="eLoanProgram">
+            <option value="">-- Select --</option>
+            ${['Conventional','FHA','VA','USDA','Jumbo'].map(p=>`<option value="${p}" ${d.loan_program===p?'selected':''}>${p}</option>`).join('')}
+          </select>
+        </div>`:''}
+      </div>
+    </div>
     <div class="modal-actions">
       <button class="btn btn-outline" onclick="openDetail(${id})">Cancel</button>
       <button class="btn" onclick="saveEdit(${id})">Save Changes</button>
@@ -796,6 +827,11 @@ async function saveEdit(id) {
   // Derive lo_comp_pct: prefer direct pct entry, else derive from amount
   const loCompPct = rawCompPct || (rawCompAmt && priceNum ? parseFloat((rawCompAmt/priceNum*100).toFixed(4)) : null);
   if (stage === 'closed' && !coe) { toast('Please enter a COE date for closed deals.', 'err'); return; }
+  // CRM fields
+  const eClientPhone  = document.getElementById('eClientPhone')?.value.trim() || null;
+  const eClientEmail  = document.getElementById('eClientEmail')?.value.trim() || null;
+  const ePropertyType = document.getElementById('ePropertyType')?.value || null;
+  const eLoanProgram  = document.getElementById('eLoanProgram')?.value || null;
   // For purchase mortgage: store both sales_price and loan_amount; for others: store the relevant one
   const pf = isPurchaseMortgage
     ? {loan_amount: price, sales_price: salesPriceVal || null}
@@ -808,6 +844,8 @@ async function saveEdit(id) {
     coe_date:coe||null, notes,
     submitted_to: lender || null, escrow_company: escrow || null,
     representation: rep || null, lo_comp_pct: loCompPct || null,
+    client_phone: eClientPhone, client_email: eClientEmail,
+    property_type: ePropertyType, loan_program: eLoanProgram,
     last_synced_at:new Date().toISOString()
   }).eq('id',id);
   if (error) { toast('Error: '+error.message,'err'); return; }
@@ -824,7 +862,10 @@ async function saveEdit(id) {
   const idx = deals.findIndex(x=>x.id===id);
   deals[idx] = {...d, stage, property_address:addr, client_name:client, ...pf,
     ...(isPurchaseMortgage && salesPriceVal ? {sales_price: salesPriceVal} : {}),
-    coe_date:coe||null, notes, submitted_to:lender, escrow_company:escrow, representation:rep||d.representation, lo_comp_pct:loCompPct};
+    coe_date:coe||null, notes, submitted_to:lender, escrow_company:escrow,
+    representation:rep||d.representation, lo_comp_pct:loCompPct,
+    client_phone:eClientPhone, client_email:eClientEmail,
+    property_type:ePropertyType, loan_program:eLoanProgram};
   closeModal(); toast('✅ Saved! Your broker has been notified.','ok');
   renderOverview(); renderDeals();
 }
