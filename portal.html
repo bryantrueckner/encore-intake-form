@@ -194,6 +194,9 @@
     <div class="nav-tab" onclick="goTab('goals')" id="tab-goals">🎯 Goals</div>
     <div class="nav-tab" onclick="goTab('requests')" id="tab-requests">📬 Requests <span id="reqBadge" style="display:none;background:#ef4444;color:white;border-radius:10px;padding:1px 7px;font-size:10px;margin-left:4px;vertical-align:middle;"></span></div>
     <div class="nav-tab" onclick="goTab('allagents')" id="tab-allagents" style="display:none">👥 All Agents</div>
+    <div class="nav-tab" onclick="goTab('marketing')" id="tab-marketing">📸 Post</div>
+    <div class="nav-tab" onclick="goTab('estimator')" id="tab-estimator">💰 Estimate</div>
+    <div class="nav-tab" onclick="goTab('profile')" id="tab-profile">👤 Profile</div>
   </div>
 
   <!-- OVERVIEW -->
@@ -245,6 +248,114 @@
   <div id="view-allagents" class="content" style="display:none">
     <div class="section-title">👥 All Agents</div>
     <div id="allAgentsList"></div>
+  </div>
+
+  <!-- MARKETING / JUST SOLD POST -->
+  <div id="view-marketing" class="content" style="display:none">
+    <div class="section-title" style="margin-bottom:16px">📸 Just Sold / Just Funded Post</div>
+    <div class="card">
+      <label class="field-label">Select a Closed Deal</label>
+      <select class="input" id="mktDealSelect" onchange="mktSelectDeal()">
+        <option value="">— Pick a closed deal —</option>
+      </select>
+    </div>
+    <div id="mktPostArea" style="display:none;margin-top:12px">
+      <div class="card" style="text-align:center">
+        <canvas id="mktCanvas" width="1080" height="1080" style="width:100%;max-width:440px;display:block;margin:0 auto;border-radius:12px;box-shadow:0 8px 32px rgba(0,0,0,0.4);"></canvas>
+      </div>
+      <div class="card" style="margin-top:12px">
+        <label class="field-label">Caption <span style="color:#64748b;font-weight:400">(editable)</span></label>
+        <textarea class="input" id="mktCaption" rows="7" style="resize:vertical;font-size:13px;line-height:1.5;"></textarea>
+      </div>
+      <div style="display:flex;gap:8px;margin-top:12px">
+        <button class="btn" onclick="mktDownload()" style="flex:1">⬇️ Download Image</button>
+        <button class="btn" onclick="mktCopyCaption()" style="flex:1;background:rgba(255,255,255,0.06);color:#e2e8f0;border:1px solid rgba(255,255,255,0.12);">📋 Copy Caption</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- COMMISSION ESTIMATOR -->
+  <div id="view-estimator" class="content" style="display:none">
+    <div class="section-title" style="margin-bottom:16px">💰 Commission Estimator</div>
+    <div class="card">
+      <div class="form-row">
+        <div>
+          <label class="field-label">Deal Type</label>
+          <select class="input" id="estType" onchange="estCalc()">
+            <option value="re">Real Estate</option>
+            <option value="mortgage">Mortgage</option>
+          </select>
+        </div>
+        <div>
+          <label class="field-label" id="estAmtLabel">Sales Price ($)</label>
+          <input type="number" class="input" id="estAmount" placeholder="e.g. 550000" oninput="estCalc()">
+        </div>
+      </div>
+      <div class="form-row" style="margin-top:12px">
+        <div>
+          <label class="field-label">Commission %</label>
+          <input type="number" class="input" id="estPct" placeholder="e.g. 2.50" step="0.01" oninput="estCalc()">
+        </div>
+        <div id="estBrokerFeeRow">
+          <label class="field-label">Broker Fee ($)</label>
+          <input type="number" class="input" id="estBrokerFee" value="925" oninput="estCalc()">
+        </div>
+      </div>
+      <div id="estResults" style="display:none;margin-top:20px;padding:18px;background:rgba(99,102,241,0.08);border-radius:12px;border:1px solid rgba(99,102,241,0.2);">
+        <div style="display:flex;justify-content:space-between;margin-bottom:10px;align-items:center">
+          <span style="color:#94a3b8;font-size:14px;">Gross Commission</span>
+          <span style="font-weight:700;color:#e2e8f0;font-size:15px;" id="estGross">$0</span>
+        </div>
+        <div id="estDeductionRow" style="display:flex;justify-content:space-between;margin-bottom:10px;align-items:center">
+          <span style="color:#94a3b8;font-size:14px;">Broker Fee</span>
+          <span style="font-weight:600;color:#ef4444;font-size:15px;" id="estDeductDisplay">−$925</span>
+        </div>
+        <div style="border-top:1px solid rgba(99,102,241,0.2);padding-top:12px;display:flex;justify-content:space-between;align-items:center">
+          <span style="font-weight:700;color:#e2e8f0;font-size:15px;">Est. Net Commission</span>
+          <span style="font-weight:800;color:#4ade80;font-size:22px;" id="estNet">$0</span>
+        </div>
+      </div>
+      <div style="margin-top:14px;font-size:12px;color:#475569;text-align:center;">Estimate only — actual net may vary based on deductions.</div>
+    </div>
+  </div>
+
+  <!-- PROFILE -->
+  <div id="view-profile" class="content" style="display:none">
+    <div class="section-title" style="margin-bottom:16px">👤 My Profile</div>
+    <div class="card">
+      <div class="form-row">
+        <div>
+          <label class="field-label">Name</label>
+          <input type="text" class="input" id="profName" disabled style="opacity:0.45;cursor:not-allowed;">
+        </div>
+        <div>
+          <label class="field-label">Email</label>
+          <input type="email" class="input" id="profEmail" disabled style="opacity:0.45;cursor:not-allowed;">
+        </div>
+      </div>
+      <div style="margin-top:14px">
+        <label class="field-label">Phone Number</label>
+        <input type="tel" class="input" id="profPhone" placeholder="(909) 555-1234">
+        <div style="font-size:12px;color:#475569;margin-top:5px;">Used for SMS deal update notifications.</div>
+      </div>
+      <div style="margin-top:16px;padding:14px;background:rgba(255,255,255,0.04);border-radius:10px;border:1px solid rgba(255,255,255,0.08);display:flex;align-items:center;justify-content:space-between;">
+        <div>
+          <div style="font-weight:600;color:#e2e8f0;font-size:14px;">📱 SMS Notifications</div>
+          <div style="font-size:12px;color:#64748b;margin-top:3px;">Get a text when your deal status changes</div>
+        </div>
+        <label style="position:relative;display:inline-block;width:44px;height:24px;flex-shrink:0">
+          <input type="checkbox" id="profSms" style="opacity:0;width:0;height:0;" onchange="updateToggleStyle()">
+          <span id="profSmsToggle" onclick="document.getElementById('profSms').click()" style="position:absolute;cursor:pointer;top:0;left:0;right:0;bottom:0;background:#334155;border-radius:24px;transition:.3s;"></span>
+          <span id="profSmsThumb" style="position:absolute;height:18px;width:18px;left:3px;bottom:3px;background:white;border-radius:50%;transition:.3s;pointer-events:none;"></span>
+        </label>
+      </div>
+      <button class="btn" style="margin-top:16px" onclick="saveProfile()">💾 Save Profile</button>
+      <div id="profSaved" style="display:none;text-align:center;color:#4ade80;font-size:13px;margin-top:8px;">✅ Profile saved!</div>
+    </div>
+    <div class="card" style="margin-top:12px;background:rgba(99,102,241,0.06);border:1px solid rgba(99,102,241,0.15);">
+      <div style="font-size:13px;font-weight:600;color:#818cf8;margin-bottom:6px;">📢 Opt-Out Anytime</div>
+      <div style="font-size:12px;color:#64748b;line-height:1.5;">To stop SMS notifications, uncheck the toggle above and save — or reply <strong style="color:#94a3b8">STOP</strong> to any text message you receive.</div>
+    </div>
   </div>
 
   <button class="fab" onclick="openAdd()">+</button>
@@ -389,7 +500,7 @@ async function loadData() {
 
 // ── TABS ──────────────────────────────────────────
 function goTab(t) {
-  const tabs = ['overview','deals','goals','requests','allagents'];
+  const tabs = ['overview','deals','goals','requests','allagents','marketing','estimator','profile'];
   tabs.forEach(v=>{
     const vEl = document.getElementById(`view-${v}`);
     const tEl = document.getElementById(`tab-${v}`);
@@ -398,6 +509,9 @@ function goTab(t) {
   });
   if (t==='goals') renderGoals();
   if (t==='allagents') renderAllAgents();
+  if (t==='marketing') initMarketing();
+  if (t==='estimator') estCalc();
+  if (t==='profile') initProfile();
 }
 function setFilter(f) {
   filter = f;
@@ -1289,6 +1403,145 @@ function toast(msg, type='ok') {
 function show(id){document.getElementById(id).style.display='block';}
 function hide(id){document.getElementById(id).style.display='none';}
 function emptyState(icon,text){return `<div class="empty"><div class="empty-icon">${icon}</div><div class="empty-text">${text}</div></div>`;}
+
+// ── MARKETING / JUST SOLD POST ─────────────────────────────────────
+let mktDeal = null;
+function initMarketing() {
+  const sel = document.getElementById('mktDealSelect');
+  sel.innerHTML = '<option value="">— Pick a closed deal —</option>';
+  const closed = deals.filter(d => d.agent_email === user.email && d.stage === 'closed');
+  closed.forEach(d => {
+    const icon = d.deal_type === 'mortgage' ? '🏦' : '🏠';
+    const street = (d.property_address || '').split(',')[0];
+    sel.innerHTML += `<option value="${d.id}">${icon} ${d.client_name || 'Client'} · ${street}</option>`;
+  });
+  if (!closed.length) sel.innerHTML = '<option value="">— No closed deals yet —</option>';
+}
+function mktSelectDeal() {
+  const id = document.getElementById('mktDealSelect').value;
+  if (!id) { document.getElementById('mktPostArea').style.display='none'; return; }
+  mktDeal = deals.find(d => String(d.id) === String(id));
+  if (!mktDeal) return;
+  document.getElementById('mktPostArea').style.display = 'block';
+  drawMktCanvas(); generateMktCaption();
+}
+function fmtPrice(n) { return '$' + parseFloat(n||0).toLocaleString('en-US',{maximumFractionDigits:0}); }
+function drawMktCanvas() {
+  const canvas = document.getElementById('mktCanvas');
+  const ctx = canvas.getContext('2d');
+  const isMtg = mktDeal?.deal_type === 'mortgage';
+  const W=1080, H=1080;
+  const bg = ctx.createLinearGradient(0,0,W,H);
+  if (isMtg) { bg.addColorStop(0,'#0a1628'); bg.addColorStop(1,'#1e3a5f'); }
+  else        { bg.addColorStop(0,'#1a0a2e'); bg.addColorStop(1,'#3b1f6b'); }
+  ctx.fillStyle=bg; ctx.fillRect(0,0,W,H);
+  const accent = isMtg ? '#3b82f6' : '#8b5cf6';
+  ctx.fillStyle=accent; ctx.fillRect(0,0,W,10);
+  ctx.beginPath(); ctx.arc(W/2,H/2,440,0,Math.PI*2);
+  ctx.strokeStyle = isMtg ? 'rgba(59,130,246,0.07)' : 'rgba(139,92,246,0.07)';
+  ctx.lineWidth=80; ctx.stroke();
+  ctx.fillStyle='#ffffff'; ctx.font='bold 96px Arial'; ctx.textAlign='center';
+  ctx.fillText(isMtg ? 'JUST FUNDED!' : 'JUST SOLD!', W/2, 210);
+  ctx.fillStyle=accent; ctx.fillRect(W/2-120,228,240,6);
+  const parts=(mktDeal?.property_address||'').split(',');
+  ctx.fillStyle='#f1f5f9'; ctx.font='bold 56px Arial';
+  ctx.fillText(parts[0]?.trim()||'', W/2, 340);
+  ctx.fillStyle='#94a3b8'; ctx.font='38px Arial';
+  ctx.fillText(parts.slice(1,3).join(',').trim(), W/2, 398);
+  const price = isMtg ? mktDeal?.loan_amount : mktDeal?.sales_price;
+  if (price) {
+    ctx.fillStyle=accent; ctx.font='bold 76px Arial'; ctx.fillText(fmtPrice(price), W/2, 528);
+    ctx.fillStyle='#64748b'; ctx.font='32px Arial';
+    ctx.fillText(isMtg ? 'Loan Amount':'Sales Price', W/2, 575);
+  }
+  ctx.strokeStyle='rgba(255,255,255,0.1)'; ctx.lineWidth=1;
+  ctx.beginPath(); ctx.moveTo(160,618); ctx.lineTo(W-160,618); ctx.stroke();
+  const agentName = user.user_metadata?.full_name || user.email.split('@')[0];
+  ctx.fillStyle='#ffffff'; ctx.font='bold 46px Arial'; ctx.fillText(agentName, W/2, 698);
+  ctx.fillStyle=accent; ctx.font='32px Arial';
+  ctx.fillText(isMtg ? 'Encore Mortgage' : 'Encore Real Estate', W/2, 748);
+  ctx.fillStyle='rgba(0,0,0,0.35)'; ctx.fillRect(0,H-90,W,90);
+  ctx.fillStyle='#64748b'; ctx.font='26px Arial';
+  ctx.fillText(isMtg ? '(909) 227-6290  ·  NMLS# 1858778' : '(909) 227-6290  ·  DRE# 02091157', W/2, H-32);
+}
+function generateMktCaption() {
+  if (!mktDeal) return;
+  const isMtg = mktDeal.deal_type === 'mortgage';
+  const street = (mktDeal.property_address||'').split(',')[0];
+  const city = (mktDeal.property_address||'').split(',')[1]?.trim()||'';
+  const price = fmtPrice(isMtg ? mktDeal.loan_amount : mktDeal.sales_price);
+  const agentName = user.user_metadata?.full_name || user.email.split('@')[0];
+  let cap = '';
+  if (isMtg) {
+    cap = `🏦 JUST FUNDED! 🏦\n\nCongratulations to our client on their new home at ${street}${city?', '+city:''}!\n\nLoan Amount: ${price}\n\nLooking for a trusted lender? Let's connect!\n\n📲 ${agentName} | Encore Mortgage\n(909) 227-6290 | NMLS# 1858778\n\n#JustFunded #EncoreMortgage #HomeLoan #NewHomeOwner #InlandEmpire #SoCalMortgage`;
+  } else {
+    const rep=(mktDeal.representation||'').toLowerCase();
+    const side=rep.includes('dual')?'both sides':rep.includes('buyer')?'the buyer':'the seller';
+    cap = `🏡 JUST SOLD! 🏡\n\nAnother one closed! Represented ${side} at ${street}${city?', '+city:''} for ${price}.\n\nThinking of buying or selling? Reach out!\n\n📲 ${agentName} | Encore Real Estate\n(909) 227-6290 | DRE# 02091157\n\n#JustSold #EncoreRealEstate #SoldByEncore #InlandEmpireRealEstate #HomeSold #SoCalRealEstate`;
+  }
+  document.getElementById('mktCaption').value = cap;
+}
+function mktDownload() {
+  const canvas=document.getElementById('mktCanvas');
+  const link=document.createElement('a');
+  const s=(mktDeal?.property_address||'post').split(',')[0].replace(/\s+/g,'_').replace(/[^a-zA-Z0-9_]/g,'');
+  link.download=`JustSold_${s}.png`; link.href=canvas.toDataURL('image/png'); link.click();
+}
+function mktCopyCaption() {
+  navigator.clipboard.writeText(document.getElementById('mktCaption').value)
+    .then(()=>showToast('Caption copied! 📋'));
+}
+
+// ── COMMISSION ESTIMATOR ───────────────────────────────────────────
+function estCalc() {
+  const type=document.getElementById('estType')?.value;
+  const amount=parseFloat(document.getElementById('estAmount')?.value)||0;
+  const pct=parseFloat(document.getElementById('estPct')?.value)||0;
+  const bf=parseFloat(document.getElementById('estBrokerFee')?.value)||0;
+  const lbl=document.getElementById('estAmtLabel');
+  if(lbl) lbl.textContent=type==='mortgage'?'Loan Amount ($)':'Sales Price ($)';
+  const brow=document.getElementById('estBrokerFeeRow');
+  if(brow) brow.style.display=type==='re'?'block':'none';
+  if(!amount||!pct){const r=document.getElementById('estResults');if(r)r.style.display='none';return;}
+  const gross=amount*pct/100;
+  const deduct=type==='re'?bf:0;
+  const net=gross-deduct;
+  const f=n=>'$'+n.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
+  document.getElementById('estGross').textContent=f(gross);
+  document.getElementById('estDeductDisplay').textContent='−'+f(deduct);
+  document.getElementById('estNet').textContent=f(net);
+  const dr=document.getElementById('estDeductionRow');
+  if(dr) dr.style.display=type==='re'?'flex':'none';
+  document.getElementById('estResults').style.display='block';
+}
+
+// ── PROFILE ────────────────────────────────────────────────────────
+function initProfile() {
+  document.getElementById('profName').value = user.user_metadata?.full_name || user.email.split('@')[0];
+  document.getElementById('profEmail').value = user.email;
+  document.getElementById('profPhone').value = user.user_metadata?.portal_phone || '';
+  const smsOn = user.user_metadata?.sms_opt_in !== false;
+  document.getElementById('profSms').checked = smsOn;
+  updateToggleStyle();
+}
+function updateToggleStyle() {
+  const on=document.getElementById('profSms').checked;
+  document.getElementById('profSmsToggle').style.background=on?'#6366f1':'#334155';
+  document.getElementById('profSmsThumb').style.transform=on?'translateX(20px)':'translateX(0)';
+}
+async function saveProfile() {
+  const phone=document.getElementById('profPhone').value.trim();
+  const smsOn=document.getElementById('profSms').checked;
+  try {
+    await sb.auth.updateUser({data:{portal_phone:phone, sms_opt_in:smsOn}});
+    await fetch('https://webhooks.tasklet.ai/v1/public/webhook?token=a24ab4497666842f788372230aaf5ff4',{
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({form_type:'portal_update_profile', agent_name:user.user_metadata?.full_name||'', agent_email:user.email, phone, sms_notifications:smsOn?1:0})
+    });
+    document.getElementById('profSaved').style.display='block';
+    setTimeout(()=>{document.getElementById('profSaved').style.display='none';},3000);
+  } catch(e){ showToast('Error saving. Please try again.'); }
+}
 
 if (!sb) {
   showLoginErr('⚠️ Could not connect to auth service. Please refresh the page or try a different browser.');
