@@ -569,6 +569,11 @@ async function submitForm() {
   const propAddr   = document.getElementById('propertyAddress').value.trim();
 
   if (!agentName || !agentEmail) { alert('Please enter your name and email.'); return; }
+  // Basic email validation — catch obvious typos like double-@ or missing dot
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (!emailRegex.test(agentEmail) || (agentEmail.match(/@/g)||[]).length > 1) {
+    alert('Please enter a valid email address (e.g. name@domain.com).'); return;
+  }
   if (!txType)                   { alert('Please select a transaction type.'); return; }
   if (!propAddr && txType !== 'new_listing') { alert('Please enter the property address.'); return; }
 
