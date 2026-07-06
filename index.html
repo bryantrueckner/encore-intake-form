@@ -24,8 +24,8 @@
 
   /* Transaction type buttons */
   .tx-type-group { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-top: 4px; }
-  .tx-type-btn { padding: 14px 8px; border: 2px solid #ddd; border-radius: 10px; background: white; cursor: pointer; text-align: center; transition: all 0.15s; font-family: inherit; }
-  .tx-type-btn .icon { font-size: 22px; display: block; margin-bottom: 4px; }
+  .tx-type-btn { padding: 20px 8px; border: 2px solid #ddd; border-radius: 10px; background: white; cursor: pointer; text-align: center; transition: all 0.15s; font-family: inherit; }
+  .tx-type-btn .icon { font-size: 26px; display: block; margin-bottom: 6px; }
   .tx-type-btn .label { font-size: 13px; font-weight: 600; color: #444; }
   .tx-type-btn:hover { border-color: #4361ee; background: #f5f7ff; }
   .tx-type-btn.active { border-color: #4361ee; background: #eef1ff; }
@@ -65,6 +65,17 @@
   .success h2 { color: #27ae60; font-size: 22px; margin-bottom: 8px; }
   .success p { color: #666; }
   .form-content.hide { display: none; }
+  /* Progress indicator */
+  .progress-bar { display: flex; align-items: center; gap: 0; margin-bottom: 20px; }
+  .progress-step { flex: 1; display: flex; align-items: center; gap: 8px; padding: 10px 14px; border-radius: 8px; background: #f0f2f5; font-size: 13px; font-weight: 600; color: #aaa; transition: all 0.2s; }
+  .progress-step.active { background: #eef1ff; color: #4361ee; }
+  .progress-step.done { background: #e8f5e9; color: #2e7d32; }
+  .progress-step .step-num { width: 22px; height: 22px; border-radius: 50%; background: #ddd; color: #888; font-size: 11px; font-weight: 700; display: flex; align-items: center; justify-content: center; flex-shrink: 0; transition: all 0.2s; }
+  .progress-step.active .step-num { background: #4361ee; color: white; }
+  .progress-step.done .step-num { background: #27ae60; color: white; }
+  .progress-connector { width: 24px; height: 2px; background: #ddd; flex-shrink: 0; transition: background 0.2s; }
+  .progress-connector.done { background: #27ae60; }
+
   .prefill-banner { background: #e8f5e9; border: 1px solid #81c784; border-radius: 8px; padding: 12px 16px; font-size: 14px; color: #1b5e20; margin-bottom: 16px; }
   .info-note { background: #fffbe6; border: 1px solid #ffe082; border-radius: 8px; padding: 10px 14px; font-size: 13px; color: #7a5c00; margin-bottom: 14px; }
 
@@ -78,8 +89,8 @@
     body { padding: 12px; }
     .field-row { grid-template-columns: 1fr !important; }
     .tx-type-group { grid-template-columns: 1fr !important; }
-    .tx-type-btn { padding: 12px 8px; }
-    .tx-type-btn .icon { font-size: 20px; }
+    .tx-type-btn { padding: 16px 8px; }
+    .tx-type-btn .icon { font-size: 24px; }
     .card { padding: 18px; }
     .btn { font-size: 15px; padding: 12px; }
     .side-card, .addon-card { padding: 12px 14px; }
@@ -96,6 +107,24 @@
 
   <div class="prefill-banner hidden" id="prefillBanner">
     📋 Pre-filled from your listing at <strong id="prefillAddress"></strong> — select your transaction type below and submit your update!
+  </div>
+
+  <!-- Progress indicator -->
+  <div class="progress-bar" id="progressBar">
+    <div class="progress-step active" id="pstep1">
+      <div class="step-num">1</div>
+      <span>Transaction Type</span>
+    </div>
+    <div class="progress-connector" id="pconn1"></div>
+    <div class="progress-step" id="pstep2">
+      <div class="step-num">2</div>
+      <span>Deal Details</span>
+    </div>
+    <div class="progress-connector" id="pconn2"></div>
+    <div class="progress-step" id="pstep3">
+      <div class="step-num">3</div>
+      <span>Review &amp; Submit</span>
+    </div>
   </div>
 
   <div class="form-content" id="formContent">
@@ -375,8 +404,26 @@ const WEBHOOK_URL = 'https://webhooks.tasklet.ai/v1/public/webhook?token=a24ab44
 let txType = '';
 let loanType = ''; // Track whether loan is for purchase or refinance
 
+function updateProgressBar(step) {
+  // step: 1 = tx type selected, 2 = details visible, 3 = ready to submit
+  const steps = [1, 2, 3];
+  steps.forEach(s => {
+    const el = document.getElementById('pstep' + s);
+    if (!el) return;
+    el.classList.remove('active', 'done');
+    if (s < step) el.classList.add('done');
+    else if (s === step) el.classList.add('active');
+  });
+  [1, 2].forEach(s => {
+    const conn = document.getElementById('pconn' + s);
+    if (!conn) return;
+    conn.classList.toggle('done', s < step);
+  });
+}
+
 function selectTxType(type) {
   txType = type;
+  updateProgressBar(2);
   ['purchase','refinance','new_listing'].forEach(t => {
     document.getElementById('btn-' + t).classList.toggle('active', t === type);
   });
@@ -445,6 +492,7 @@ function updateSides() {
 
   detailsCard.classList.remove('hidden');
   document.getElementById('submitBtn').classList.remove('hidden');
+  updateProgressBar(3);
 
   setHidden('loanFields',         !loan);
   setHidden('buyerFields',        !buyer);
@@ -457,8 +505,10 @@ function updateSides() {
   setHidden('propertyTypeSection', !(buyer || seller));
   setHidden('loanProgramSection',  !loan);
   
-  // Show loanTypeQuestion only on Purchase deals when loan is checked
-  setHidden('loanTypeQuestion', !(loan && txType === 'purchase'));
+  // Auto-set loanType on purchase (no need to ask — it's always a purchase loan)
+  if (loan && txType === 'purchase') loanType = 'purchase';
+  // Always hide loanTypeQuestion — it's redundant since txType already captures this
+  setHidden('loanTypeQuestion', true);
 
   document.getElementById('loanSectionLabel').style.display = (buyer || seller) ? '' : 'none';
   document.getElementById('buyerNameLabel').textContent =
@@ -497,6 +547,7 @@ function toggleCardStyle(id, isActive, activeClasses) {
 function showDetailsForRefinance() {
   document.getElementById('detailsCard').classList.remove('hidden');
   document.getElementById('submitBtn').classList.remove('hidden');
+  updateProgressBar(3);
   setHidden('loanFields',         false);
   setHidden('buyerFields',        true);
   setHidden('sellerFields',       true);
@@ -513,6 +564,7 @@ function showDetailsForRefinance() {
 function showDetailsForNewListing() {
   document.getElementById('detailsCard').classList.remove('hidden');
   document.getElementById('submitBtn').classList.remove('hidden');
+  updateProgressBar(3);
   setHidden('loanFields',         true);
   setHidden('buyerFields',        true);
   setHidden('sellerFields',       true);
@@ -596,7 +648,7 @@ async function submitForm() {
     if (!loan && !buyer && !seller) { alert('Please select at least one side.'); return; }
     
     // If loan is selected, user must choose Purchase or Refinance for the loan
-    if (loan && !loanType) { alert('Please specify if this loan is for a Purchase or Refinance.'); return; }
+    if (loan && !loanType) loanType = 'purchase'; // fallback safety
 
     const notes        = document.getElementById('notes').value.trim();
     const escrowCo     = document.getElementById('escrowCompany').value.trim();
