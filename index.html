@@ -123,7 +123,7 @@
     <div class="progress-connector" id="pconn2"></div>
     <div class="progress-step" id="pstep3">
       <div class="step-num">3</div>
-      <span>Review &amp; Submit</span>
+      <span>Ready to Submit</span>
     </div>
   </div>
 
@@ -208,14 +208,7 @@
       <div id="loanFields" class="hidden">
         <div class="section-label" id="loanSectionLabel">🏦 Loan Details</div>
         
-        <!-- For Purchase deals: ask if loan is Purchase or Refinance -->
-        <div id="loanTypeQuestion" class="hidden" style="margin-bottom: 16px; padding: 12px; background: #f5f7ff; border-radius: 10px; border-left: 4px solid #4361ee;">
-          <p style="font-size: 13px; font-weight: 600; color: #444; margin-bottom: 8px;">Is this loan for a Purchase or Refinance?</p>
-          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
-            <button type="button" id="loanType-purchase" onclick="selectLoanType('purchase')" style="padding: 10px; border: 2px solid #ddd; border-radius: 8px; background: white; cursor: pointer; font-size: 13px; font-weight: 600; color: #444; transition: all 0.15s;">🤝 Purchase</button>
-            <button type="button" id="loanType-refinance" onclick="selectLoanType('refinance')" style="padding: 10px; border: 2px solid #ddd; border-radius: 8px; background: white; cursor: pointer; font-size: 13px; font-weight: 600; color: #444; transition: all 0.15s;">🔄 Refinance</button>
-          </div>
-        </div>
+        <!-- loanTypeQuestion removed — purchase loan type is inferred from transaction type -->
         
         <div class="field">
           <label class="required">Borrower Name</label>
@@ -387,7 +380,7 @@
       </div>
     </div>
 
-    <button class="btn hidden" id="submitBtn" onclick="submitForm()">Submit Deal</button>
+    <button class="btn hidden" id="submitBtn" onclick="submitForm()">Submit to Pipeline</button>
   </div>
 
   <div class="success" id="successMsg">
@@ -458,17 +451,6 @@ function toggleSide(side) {
 
 function toggleAddon(addon) {
   setTimeout(() => updateListingAddons(), 0);
-}
-
-function selectLoanType(type) {
-  loanType = type;
-  document.getElementById('loanType-purchase').style.borderColor = type === 'purchase' ? '#4361ee' : '#ddd';
-  document.getElementById('loanType-purchase').style.background = type === 'purchase' ? '#eef1ff' : 'white';
-  document.getElementById('loanType-purchase').style.color = type === 'purchase' ? '#4361ee' : '#444';
-  
-  document.getElementById('loanType-refinance').style.borderColor = type === 'refinance' ? '#4361ee' : '#ddd';
-  document.getElementById('loanType-refinance').style.background = type === 'refinance' ? '#eef1ff' : 'white';
-  document.getElementById('loanType-refinance').style.color = type === 'refinance' ? '#4361ee' : '#444';
 }
 
 function updateSides() {
@@ -782,7 +764,10 @@ function handleError(btn) {
 function resetForm() {
   document.getElementById('formContent').classList.remove('hide');
   document.getElementById('successMsg').classList.remove('show');
-  document.querySelectorAll('input:not([type=checkbox])').forEach(el => el.value = '');
+  // Clear all inputs EXCEPT pre-filled locked fields
+  document.querySelectorAll('input:not([type=checkbox])').forEach(el => {
+    if (!el.readOnly) el.value = '';
+  });
   document.querySelectorAll('textarea').forEach(el => el.value = '');
   document.querySelectorAll('input[type=checkbox]').forEach(el => el.checked = false);
   ['purchase','refinance','new_listing'].forEach(t => document.getElementById('btn-' + t).classList.remove('active'));
@@ -796,14 +781,6 @@ function resetForm() {
   });
   txType = '';
   loanType = '';
-  // Reset loan type buttons
-  document.getElementById('loanType-purchase').style.borderColor = '#ddd';
-  document.getElementById('loanType-purchase').style.background = 'white';
-  document.getElementById('loanType-purchase').style.color = '#444';
-  document.getElementById('loanType-refinance').style.borderColor = '#ddd';
-  document.getElementById('loanType-refinance').style.background = 'white';
-  document.getElementById('loanType-refinance').style.color = '#444';
-  
   document.getElementById('sidesCard').classList.add('hidden');
   document.getElementById('detailsCard').classList.add('hidden');
   document.getElementById('submitBtn').classList.add('hidden');
